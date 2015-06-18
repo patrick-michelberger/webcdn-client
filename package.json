@@ -1,0 +1,27 @@
+{
+  "name": "webcdn-client",
+  "version": "0.0.1",
+  "description": "client for a browser-based content distribution network using WebRTC",
+  "main": "Gruntfile.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pmichelberger/webcdn-client.git"
+  },
+  "author": "patrick_michelberger <pmichelberger@googlemail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pmichelberger/webcdn-client/issues"
+  },
+  "homepage": "https://github.com/pmichelberger/webcdn-client",
+  "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-contrib-connect": "^0.10.1",
+    "grunt-contrib-jshint": "^0.11.2",
+    "grunt-contrib-requirejs": "^0.4.4",
+    "grunt-contrib-watch": "^0.6.1",
+    "grunt-contrib-yuidoc": "^0.8.0"
+  }
+}

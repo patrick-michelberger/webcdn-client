@@ -1,0 +1,12 @@
+{
+    "project": {
+        "name": "webcdn-client",
+        "description": "client for a browser-based content distribution network using WebRTC",
+        "version": "0.0.1"
+    },
+    "files": {},
+    "modules": {},
+    "classes": {},
+    "classitems": [],
+    "warnings": []
+}
