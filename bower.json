@@ -1,0 +1,22 @@
+{
+  "name": "webcdn",
+  "version": "0.0.1",
+  "authors": [
+    "patrick_michelberger <pmichelberger@googlemail.com>"
+  ],
+  "description": "Client for a browser-based content distribution network using WebRTC",
+  "main": "dist/webcdn.js",
+  "keywords": [
+    "CDN",
+    "WebRTC",
+    "WebCDN"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
