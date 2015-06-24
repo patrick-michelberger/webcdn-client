@@ -4,25 +4,28 @@
 <head>
     <meta charset="utf-8">
     <script type="text/javascript" src="../dist/webcdn.min.js"></script>
-    <style>
-    body {
-        font-family: "Helvetica Neue", Helvetica, sans-serif;
-        font-size: 16px;
-        line-height: 1.5;
-        font-weight: 300;
-    }
-    </style>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
 </head>
 
 <body>
-    <h2>WebCDN Demo</h2>
-    <img data-webcdn-fallback="images/example_image_1.jpeg" src="images/example_image_1.jpeg" width="32%" />
-    <img data-webcdn-fallback="images/example_image_2.jpeg" src="images/example_image_2.jpeg" width="32%" />
-    <img src="images/example_image_3.jpeg" width="32%" />
-    <script>
-    <!-- Example code goes here -->
-    var objects = document.querySelectorAll('[data-webcdn-fallback]');
-    </script>
+    <div class="container">
+        <h2>WebCDN Demo</h2>
+        <div class="row">
+            <div class="col-xs-12 col-sm-4">
+                <img data-webcdn-fallback="images/example_image_1.jpeg" src="images/example_image_1.jpeg" class="img-responsive" />
+            </div>
+            <div class="col-xs-12 col-sm-4">
+                <img data-webcdn-fallback="images/example_image_2.jpeg" src="images/example_image_2.jpeg" class="img-responsive" />
+            </div>
+            <div class="col-xs-12 col-sm-4">
+                <img data-webcdn-fallback="images/example_image_3.jpeg" src="images/example_image_3.jpeg" class="img-responsive" />
+            </div>
+        </div>
+        <script>
+        <!-- Example code goes here -->
+        var webcdn = new WebCDN();
+        webcdn.initHashing();
+        </script>
 </body>
 
 </html>

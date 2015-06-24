@@ -7,6 +7,9 @@ break anything with or without it. -->
 <div id="mocha"></div>
 <!-- This is where any fixtures we need for the test will be inserted into. Naturally, we won't want to cover the mocha test results so we position this bad boy off screen. -->
 <div id="test" style="position: fixed; top: 0; left: -99999px;">
+    <img data-webcdn-fallback="images/example_image_1.jpeg" class="img-responsive" />
+    <img data-webcdn-fallback="images/example_image_2.jpeg" class="img-responsive" />
+    <img data-webcdn-fallback="images/example_image_3.jpeg" class="img-responsive" />
 </div>
 <!-- We need to insert our testing dependencies here -->
 <script src="../node_modules/chai/chai.js"></script>
@@ -18,7 +21,7 @@ break anything with or without it. -->
 mocha.setup('bdd');
 </script>
 <!-- The source file we will be testing! Don't forget the data-cover attribute so Blanket will know which file will need to be instrumented for coverage. -->
-<script src="../src/webcdn.js" data-cover></script>
+<script src="../dist/webcdn.min.js" data-cover></script>
 <!-- Our test suite needs to be after the source file, of course -->
 <script src="webcdn.test.js"></script>
 <script>
