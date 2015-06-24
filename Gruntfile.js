@@ -130,5 +130,5 @@ module.exports = function(grunt) {
     grunt.registerTask('doc', ['yuidoc']);
     grunt.registerTask('test', ['blanket_mocha']);
     grunt.registerTask('scripts', ['uglify', 'clean:scripts']);
-    grunt.registerTask('build', ['blanket_mocha', 'clean:build', 'copy', 'scripts', 'doc']);
+    grunt.registerTask('build', ['blanket_mocha', 'clean:build', 'copy', 'scripts']);
 };
