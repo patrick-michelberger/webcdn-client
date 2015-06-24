@@ -1,1 +1,0 @@
-{"version":3,"file":"webcdn.js","sources":["webcdn.js"],"names":["console","log","define"],"mappings":"AAAAA,QAAAC,IAAA,cACAC,OAAA,SAAA","sourcesContent":["console.log(\"Hallo Welt\");\ndefine(\"webcdn\", function(){});\n\n"]}

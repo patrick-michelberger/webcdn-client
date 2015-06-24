@@ -3,13 +3,13 @@ module.exports = function(grunt) {
         pkg: grunt.file.readJSON('package.json'),
         connect: {
             server: {
-                base: 'src/',
+                base: '/',
                 keepalive: true,
-                port: 80
+                port: 80,
+                hostname: '*'
             }
         },
         jshint: {
-
             files: ['Gruntfile.js', 'src/**.js', '!src/js/lib/**', '!src/js/require*.js'],
             options: {
                 curly: true,
@@ -47,32 +47,44 @@ module.exports = function(grunt) {
                 }
             }
         },
-        requirejs: {
-            compile: {
+
+        copy: {
+            build: {
+                cwd: 'src',
+                src: ['**'],
+                dest: 'dist',
+                expand: true
+            },
+        },
+
+        clean: {
+            build: {
+                src: ['dist']
+            },
+            scripts: {
+                src: ['dist/**/*.js', '!dist/webcdn.min.js']
+            }
+        },
+
+        uglify: {
+            build: {
                 options: {
-                    appDir: "",
-                    baseUrl: "src",
-                    dir: "dist",
-                    name: 'webcdn',
-                    mainConfigFile: 'src/webcdn.js',
-                    optimize: "uglify2",
-                    optimizeCss: 'none',
-                    generateSourceMaps: true,
-                    preserveLicenseComments: false,
-                    skipDirOptimize: true,
-                    fileExclusionRegExp: /^\.|sass/,
-                    removeCombined: true,
-                    useStrict: false
+                    mangle: false
+                },
+                files: {
+                    'dist/webcdn.min.js': ['dist/**/*.js']
                 }
             }
         },
 
         watch: {
-            options: {
-                livereload: true
+            scripts: {
+                files: ['src/**/*.js'],
+                tasks: ['scripts']
             },
-            html_and_scripts: {
-                files: ['./src/**', '!./src/js/lib/**', './src/*.html']
+            copy: {
+                files: ['/src/**'],
+                tasks: ['copy']
             }
         },
 
@@ -87,6 +99,18 @@ module.exports = function(grunt) {
                     outdir: './doc'
                 }
             }
+        },
+
+        blanket_mocha: {
+            options: {
+                run: true,
+                reporter: 'Min',
+                // We want a minimum of 70% coverage
+                threshold: 70
+            },
+            files: {
+                src: 'tests/*.html'
+            }
         }
 
     });
@@ -94,13 +118,17 @@ module.exports = function(grunt) {
     // Load NPM Tasks
     grunt.loadNpmTasks('grunt-contrib-connect');
     grunt.loadNpmTasks('grunt-contrib-jshint');
-    grunt.loadNpmTasks('grunt-contrib-requirejs');
+    grunt.loadNpmTasks('grunt-contrib-copy');
+    grunt.loadNpmTasks('grunt-contrib-clean');
+    grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-watch');
     grunt.loadNpmTasks('grunt-contrib-yuidoc');
+    grunt.loadNpmTasks('grunt-blanket-mocha');
 
     // Define Tasks
-    grunt.registerTask('default', ['watch']);
+    grunt.registerTask('default', ['build', 'connect', 'watch']);
     grunt.registerTask('doc', ['yuidoc']);
-    grunt.registerTask('deploy', ['doc', 'requirejs']);
-
+    grunt.registerTask('test', ['blanket_mocha']);
+    grunt.registerTask('scripts', ['uglify', 'clean:scripts']);
+    grunt.registerTask('build', ['blanket_mocha', 'clean:build', 'copy', 'scripts', 'doc']);
 };
