@@ -106,7 +106,7 @@ module.exports = function(grunt) {
                 run: true,
                 reporter: 'Min',
                 // We want a minimum of 70% coverage
-                //threshold: 70
+                threshold: 70
             },
             files: {
                 src: 'tests/*.html'
