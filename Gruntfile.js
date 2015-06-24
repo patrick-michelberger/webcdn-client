@@ -81,7 +81,7 @@ module.exports = function(grunt) {
             scripts: {
                 files: ['src/**/*.js'],
                 tasks: ['build']
-            },  
+            },
             copy: {
                 files: ['/src/**'],
                 tasks: ['copy']
@@ -101,12 +101,18 @@ module.exports = function(grunt) {
             }
         },
 
+        mocha: {
+            test: {
+                src: ['tests/**/*.html'],
+            },
+        },
+
         blanket_mocha: {
             options: {
                 run: true,
                 reporter: 'Min',
                 // We want a minimum of 70% coverage
-                threshold: 70   
+                threshold: 70
             },
             files: {
                 src: 'tests/*.html'
@@ -131,12 +137,13 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-watch');
     grunt.loadNpmTasks('grunt-contrib-yuidoc');
     grunt.loadNpmTasks('grunt-blanket-mocha');
+    grunt.loadNpmTasks('grunt-mocha');
     grunt.loadNpmTasks('grunt-browserify');
 
     // Define Tasks
     grunt.registerTask('default', ['scripts', 'connect', 'watch']);
     grunt.registerTask('doc', ['yuidoc']);
-    grunt.registerTask('test', ['blanket_mocha']);
-    grunt.registerTask('scripts', ['browserify','uglify']);
-    grunt.registerTask('build', ['blanket_mocha', 'clean:build', 'copy', 'scripts']);
+    grunt.registerTask('test', ['mocha']);
+    grunt.registerTask('scripts', ['browserify', 'uglify']);
+    grunt.registerTask('build', ['mocha', 'clean:build', 'copy', 'scripts']);
 };

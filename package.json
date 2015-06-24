@@ -30,6 +30,7 @@
     "grunt-contrib-uglify": "^0.9.1",
     "grunt-contrib-watch": "^0.6.1",
     "grunt-contrib-yuidoc": "^0.8.0",
+    "grunt-mocha": "^0.4.13",
     "mocha": "^2.2.5"
   },
   "dependencies": {
