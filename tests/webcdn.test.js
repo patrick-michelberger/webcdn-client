@@ -1,4 +1,5 @@
 var expect = chai.expect;
+var updateMessage = '{"type":"update","data":["123456","125355"]}';
 
 describe('WebCDN', function() {
     before(function() {
@@ -22,4 +23,14 @@ describe('WebCDN', function() {
             expect(hash).to.equal('9be2d5a9a52ee415ac31fa0c01e41b05d969e8c4');
         });
     });
+
+    describe('.connect', function() {
+        it('should connect to a websocket server', function() {
+            var spy = sinon.spy(window, 'WrapWebSocket');
+            this.webcdn.connect('ws://' + location.hostname + ':1337');
+            expect(spy.calledOnce);
+        });
+    });
+
+
 });
