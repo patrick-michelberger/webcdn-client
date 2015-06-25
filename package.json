@@ -31,7 +31,9 @@
     "grunt-contrib-watch": "^0.6.1",
     "grunt-contrib-yuidoc": "^0.8.0",
     "grunt-mocha": "^0.4.13",
-    "mocha": "^2.2.5"
+    "mocha": "^2.2.5",
+    "sinon": "^1.15.3",
+    "sinon-chai": "^2.8.0"
   },
   "dependencies": {
     "sha1": "^1.1.1"
