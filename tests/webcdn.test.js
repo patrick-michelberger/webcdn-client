@@ -10,8 +10,16 @@ describe('WebCDN', function() {
             this.webcdn.initHashing();
             var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
             items.forEach(function(item) {
-            	expect(item.dataset.webcdnHash).not.to.be.empty;
+                expect(item.dataset.webcdnHash).not.to.be.empty;
             });
+        });
+    });
+
+    describe('.getItemHash', function() {
+        it('should return a hash for a DOM element', function() {
+            var imageNode = document.querySelector('[data-webcdn-fallback]');
+            var hash = this.webcdn.getItemHash(imageNode);
+            expect(hash).to.equal('9be2d5a9a52ee415ac31fa0c01e41b05d969e8c4');
         });
     });
 });

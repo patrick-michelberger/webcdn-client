@@ -4,7 +4,7 @@
   "description": "client for a browser-based content distribution network using WebRTC",
   "main": "Gruntfile.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "grunt test",
     "build": "browserify src/webcdn.js > dist/webcdn.js"
   },
   "repository": {
