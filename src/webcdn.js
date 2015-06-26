@@ -2,11 +2,6 @@
 
 var sha1 = require('sha1');
 
-// wrapper for testing
-window.WrapWebSocket = function() {
-    return window.WebSocket;
-};
-
 (function(window) {
 
     function WebCDN(config) {
@@ -22,6 +17,17 @@ window.WrapWebSocket = function() {
         var handleRelayMessage = function() {
             // TODO
             console.log("handleRelayMessage...");
+        };
+
+        var sendMessage = function(type, data, receiver) {
+            var msg = {
+                type: type,
+                to: receiver,
+                data: data
+            };
+            var s_msg = JSON.stringify(msg);
+            console.log("sendMessage...: ", s_msg);
+            socket.send(s_msg);
         };
 
         // Public Methods (API)
@@ -40,17 +46,18 @@ window.WrapWebSocket = function() {
         };
 
 
-        self.connect = function(coordinatorUrl) {
+        self.connect = function(coordinatorUrl, callback) {
             if (socket) {
                 trace("Socket exist, init fail.");
+                callback();
                 return;
             }
 
-            var WS = WrapWebSocket();
-            socket = new WS(coordinatorUrl + '?id=' + uuid);
+            socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
 
             socket.addEventListener("open", function(event) {
                 trace("WebSocket.onopen", event);
+                callback();
                 // TODO initPeerConnection();
             }, false);
             socket.addEventListener("close", function(event) {
@@ -66,7 +73,17 @@ window.WrapWebSocket = function() {
                     handleRelayMessage(msg.data);
                 }
             }, false);
-        
+
+        };
+
+        self.disconnect = function() {
+            socket.close();
+            socket = null;
+        };
+
+        self.sendUpdate = function(hashes) {
+            console.log("sendUpdate: ", this);
+            sendMessage('update', hashes);
         };
     };
 
