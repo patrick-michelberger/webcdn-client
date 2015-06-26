@@ -26,7 +26,6 @@ var sha1 = require('sha1');
                 data: data
             };
             var s_msg = JSON.stringify(msg);
-            console.log("sendMessage...: ", s_msg);
             socket.send(s_msg);
         };
 
@@ -46,18 +45,17 @@ var sha1 = require('sha1');
         };
 
 
-        self.connect = function(coordinatorUrl, callback) {
+        self.connect = function(coordinatorUrl) {
             if (socket) {
                 trace("Socket exist, init fail.");
-                callback();
                 return;
             }
 
-            socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
+            //socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
+            socket = new WebSocket(coordinatorUrl);
 
             socket.addEventListener("open", function(event) {
                 trace("WebSocket.onopen", event);
-                callback();
                 // TODO initPeerConnection();
             }, false);
             socket.addEventListener("close", function(event) {
@@ -82,7 +80,6 @@ var sha1 = require('sha1');
         };
 
         self.sendUpdate = function(hashes) {
-            console.log("sendUpdate: ", this);
             sendMessage('update', hashes);
         };
     };

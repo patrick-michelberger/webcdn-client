@@ -3,10 +3,12 @@ window.WebSocket = MockSocket;
 var expect = chai.expect;
 var updateMessage = '{"type":"update","data":["123456","125355"]}';
 
+var uuid = "1234";
+
 describe('WebCDN', function() {
     var self = this;
 
-    var mockServer = new MockServer('ws://localhost:8080');
+    var mockServer = new MockServer('ws://localhost:8080?id=' + uuid);
 
     mockServer.on('connection', function(server) {
         server.on('update', function(data) {
@@ -36,47 +38,27 @@ describe('WebCDN', function() {
         });
     });
 
-    /*
     describe('.connect', function() {
-        it('should connect to a websocket server', function() {
-            var spy = sinon.spy(window, 'WrapWebSocket');
-            self.webcdn.connect('ws://' + location.hostname + ':1337', function() {
-                console.log("connected to socket server");
-                expect(spy.calledOnce);
+        it('should connect to the websocket server', function(done) {
+            mockServer.on('connection', function(server) {
+                expect(true).to.be.true;
+                done();
             });
+            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
         });
     });
-    
 
     describe('.update', function() {
-        it('should send a update message to the websocket server', function() {
-            self.webcdn.connect('ws://' + location.hostname + ':1337', function() {
-                self.webcdn.sendUpdate(updateMessage);
+        it('should send a update message to the websocket server', function(done) {
+            mockServer.on('message', function(data) {
+                var msg = JSON.parse(data);
+                expect(msg.type).to.be.equal('update');
+                expect(msg.data).to.equal('["123456","125355"]');
+                done();
             });
+            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
+            self.webcdn.sendUpdate('["123456","125355"]');
         });
     });
-    */
-
-    /*
-        describe('.socketTest', function() {
-            it('should do something', function() {
-                // This is creating a MockSocket object and not a WebSocket object
-                var mockSocket = new WebSocket('ws://localhost:8080');
-                expect(2);
-
-                mockSocket.onopen = function(e) {
-                    console.log("socket open");a
-                    //equal(true, true, 'onopen fires as expected');
-                };
-
-                mockSocket.onmessage = function(data) {
-                    console.log("socket message: ", data);
-                };
-
-                mockSocket.send('world');
-            });
-        });
-    */
-
 
 });
