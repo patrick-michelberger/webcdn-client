@@ -57,7 +57,20 @@ describe('WebCDN', function() {
                 done();
             });
             self.webcdn.connect('ws://localhost:8080?id=' + uuid);
-            self.webcdn.sendUpdate('["123456","125355"]');
+            self.webcdn.update('["123456","125355"]');
+        });
+    });
+
+    describe('.lookup', function() {
+        it('should send a lookup request to the coordinator', function(done) {
+            mockServer.on('message', function(data) {
+                var msg = JSON.parse(data);
+                expect(msg.type).to.be.equal('lookup');
+                expect(msg.data).to.equal('["123456"]');
+                done();
+            });
+            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
+            self.webcdn.lookup('["123456"]');
         });
     });
 

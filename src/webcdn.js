@@ -79,9 +79,14 @@ var sha1 = require('sha1');
             socket = null;
         };
 
-        self.sendUpdate = function(hashes) {
+        self.update = function(hashes) {
             sendMessage('update', hashes);
         };
+
+        self.lookup = function(hash) {
+            sendMessage("lookup", hash);
+        };
+
     };
 
     // helpers
