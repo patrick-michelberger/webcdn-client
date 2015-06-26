@@ -1,92 +1,56 @@
 'use strict';
 
 var sha1 = require('sha1');
+var Messenger = require('./lib/messenger.js');
 
 (function(window) {
 
     function WebCDN(config) {
         // Private attributes
         var self = this;
-        var socket = null;
-        var pc = null;
-        var sendChannel = null;
         var uuid = UUID();
         var events = [];
 
-        // Private Methods
-        var handleRelayMessage = function() {
-            // TODO
-            console.log("handleRelayMessage...");
+        this._hashs = [];
+        this._messenger = new Messenger();
+
+        self.init = function() {
+            self._initHashing();
         };
 
-        var sendMessage = function(type, data, receiver) {
-            var msg = {
-                type: type,
-                to: receiver,
-                data: data
-            };
-            var s_msg = JSON.stringify(msg);
-            socket.send(s_msg);
+        self.connect = function(coordinator) {
+            self._messenger.connect(coordinator, function() {   
+                console.log("hash_list: ", self._hashs);
+                self._update(self._hashs);
+            });
         };
 
-        // Public Methods (API)
-        self.initHashing = function() {
+        self.load = function(content_hash, id) {
+
+        };
+
+        self._initHashing = function() {
             var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
             items.forEach(function(item) {
-                var hash = self.getItemHash(item);
+                var hash = self._getItemHash(item);
+                self._hashs.push(hash);
                 item.dataset.webcdnHash = hash;
             });
         };
 
-        self.getItemHash = function(item) {
+        self._getItemHash = function(item) {
             var data = getImageData(item);
             var hash = sha1(data);
             return hash;
         };
 
-
-        self.connect = function(coordinatorUrl) {
-            if (socket) {
-                trace("Socket exist, init fail.");
-                return;
-            }
-
-            //socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
-            socket = new WebSocket(coordinatorUrl);
-
-            socket.addEventListener("open", function(event) {
-                trace("WebSocket.onopen", event);
-                // TODO initPeerConnection();
-            }, false);
-            socket.addEventListener("close", function(event) {
-                trace("WebSocket.onclose", event);
-            }, false);
-            socket.addEventListener("error", function(event) {
-                trace("WebSocket.onerror", event);
-            }, false);
-            socket.addEventListener("message", function(event) {
-                trace("WebSocket.onmessage", event);
-                var msg = JSON.parse(event.data);
-                if (msg.type == "relay" && msg.data) {
-                    handleRelayMessage(msg.data);
-                }
-            }, false);
-
+        self._update = function(hashes) {
+            self._messenger.send('update', hashes);
         };
 
-        self.disconnect = function() {
-            socket.close();
-            socket = null;
+        self._lookup = function(hash) {
+            self._messenger.send('lookup', hash);
         };
-
-        self.update = function(hashes) {
-            sendMessage('update', hashes);
-        };
-
-        self.lookup = function(hash) {
-            sendMessage("lookup", hash);
-        };
-
     };
 
     // helpers

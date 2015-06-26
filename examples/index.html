@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <script type="text/javascript" src="../dist/webcdn.min.js"></script>
+    <script type="text/javascript" src="../dist/webcdn.js"></script>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
 </head>
 
@@ -24,7 +24,7 @@
         <script>
         <!-- Example code goes here -->
         var webcdn = new WebCDN();
-        webcdn.initHashing();
+        webcdn.init();
         webcdn.connect('ws://' + location.hostname + ':1337');
         </script>
 </body>
