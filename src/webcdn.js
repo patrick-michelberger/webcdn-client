@@ -2,31 +2,47 @@
 
 var sha1 = require('sha1');
 var Messenger = require('./lib/messenger.js');
+var Peernet = require('./lib/peernet.js');
+var Logger = require('./lib/logger.js');
 
 (function(window) {
+
+    window.logger = new Logger();
 
     function WebCDN(config) {
         // Private attributes
         var self = this;
-        var uuid = UUID();
         var events = [];
 
         this._hashs = [];
         this._messenger = new Messenger();
+        this._peernet = new Peernet({
+            signalChannel: this._messenger
+        });
 
-        self.init = function() {
-            self._initHashing();
+        self._messenger.on('lookup-response', function(peerId) {
+            console.log("create peer connection with ", peerId);
+            self._peernet.createConnection(peerId);
+        });
+
+        self.init = function(coordinatorUrl, callback) {
+            var self = this;
+            self.connect(coordinatorUrl, function() {
+                self._initHashing();
+                self._update(self._hashs);
+                callback();
+            });
         };
 
-        self.connect = function(coordinator) {
-            self._messenger.connect(coordinator, function() {   
-                console.log("hash_list: ", self._hashs);
-                self._update(self._hashs);
+        self.connect = function(coordinatorUrl, callback) {
+            self._messenger.connect(coordinatorUrl, function() {
+                callback();
             });
         };
 
         self.load = function(content_hash, id) {
-
+            var elem = document.getElementById(id);
+            self._lookup(content_hash);
         };
 
         self._initHashing = function() {
@@ -35,6 +51,7 @@ var Messenger = require('./lib/messenger.js');
                 var hash = self._getItemHash(item);
                 self._hashs.push(hash);
                 item.dataset.webcdnHash = hash;
+                self.load(hash, item.id)
             });
         };
 
@@ -63,37 +80,6 @@ var Messenger = require('./lib/messenger.js');
         var data = canvas.toDataURL("image/jpeg");
         return data;
     };
-
-    function trace(text) {
-        //console.log((performance.now() / 1000).toFixed(3) + ": " + text);
-        console.log(text);
-    };
-
-    // Generate UUID
-    var UUID = (function() {
-        function b(
-            a // placeholder
-        ) {
-            return a // if the placeholder was passed, return
-                ? ( // a random number from 0 to 15
-                    a ^ // unless b is 8,
-                    Math.random() // in which case
-                    * 16 // a random number from
-                    >> a / 4 // 8 to 11
-                ).toString(16) // in hexadecimal
-                : ( // or otherwise a concatenated string:
-                    [1e7] + // 10000000 +
-                    -1e3 + // -1000 +
-                    -4e3 + // -4000 +
-                    -8e3 + // -80000000 +
-                    -1e11 // -100000000000,
-                ).replace( // replacing
-                    /[018]/g, // zeroes, ones, and eights with
-                    b // random hex digits
-                )
-        }
-        return b;
-    })();
 
     window.WebCDN = WebCDN;
 })(window);
