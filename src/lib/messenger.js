@@ -47,7 +47,7 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
     };
 
     self.socket.onmessage = function(event) {
-        var msg = event.data;
+        var msg = JSON.parse(event.data);
         if (msg.type === "relay" && msg.data) {
             self._handleRelayMessage(msg.data);
         }
