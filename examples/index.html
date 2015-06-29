@@ -9,23 +9,25 @@
 
 <body>
     <div class="container">
-        <h2>WebCDN Demo</h2>
+        <h3>WebCDN</h3>
         <div class="row">
             <div class="col-xs-12 col-sm-4">
-                <img data-webcdn-fallback="images/example_image_1.jpeg" src="images/example_image_1.jpeg" class="img-responsive" />
+                <img id="webcdn-image-1" data-webcdn-fallback="http://cdn.edited.de/file/a7bf4672b7038f77b7704fdab1dc91e5?width=350&height=443&quality=100" class="img-responsive" />
             </div>
             <div class="col-xs-12 col-sm-4">
-                <img data-webcdn-fallback="images/example_image_2.jpeg" src="images/example_image_2.jpeg" class="img-responsive" />
+                <img id="webcdn-image-2" data-webcdn-fallback="http://cdn.edited.de/file/74cfb2ab30acab64f65bc986a9fd3a14?width=350&height=443&quality=100" class="img-responsive" />
             </div>
             <div class="col-xs-12 col-sm-4">
-                <img data-webcdn-fallback="images/example_image_3.jpeg" src="images/example_image_3.jpeg" class="img-responsive" />
+                <img id="webcdn-image-3" data-webcdn-fallback="http://cdn.edited.de/file/e32e267ab91c940c99770854626666e2?width=350&height=443&quality=100" class="img-responsive" />
             </div>
         </div>
         <script>
         <!-- Example code goes here -->
         var webcdn = new WebCDN();
-        webcdn.init();
-        webcdn.connect('ws://' + location.hostname + ':1337');
+        webcdn.init('ws://' + location.hostname + ':1337', function() {
+            console.log("WebCDN ready!");
+
+        });
         </script>
 </body>
 
