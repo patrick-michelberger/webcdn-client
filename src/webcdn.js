@@ -14,22 +14,28 @@ var Logger = require('./lib/logger.js');
         var self = this;
         var events = [];
 
-        this._hashs = [];
+        this._items = {};
+        this._hashes = [];
         this._messenger = new Messenger();
         this._peernet = new Peernet({
             signalChannel: this._messenger
         });
 
-        self._messenger.on('lookup-response', function(peerId) {
-            console.log("create peer connection with ", peerId);
-            self._peernet.createConnection(peerId);
+        self._messenger.on('lookup-response', function(data) {
+            if (data.peerid) {
+                // TODO create datachannel self._peernet.createConnection(data.peerid);
+                var peer = self._peernet.createConnection(data.peerid);
+                peer.doOffer();
+            } else {
+                // CDN Fallback
+                self._loadImageByCDN(data.hash);
+            }
         });
 
         self.init = function(coordinatorUrl, callback) {
-            var self = this;
             self.connect(coordinatorUrl, function() {
                 self._initHashing();
-                self._update(self._hashs);
+                self._initLookup();
                 callback();
             });
         };
@@ -49,15 +55,15 @@ var Logger = require('./lib/logger.js');
             var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
             items.forEach(function(item) {
                 var hash = self._getItemHash(item);
-                self._hashs.push(hash);
+                self._hashes.push(hash);
+                self._items[hash] = item.id;
                 item.dataset.webcdnHash = hash;
-                self.load(hash, item.id)
             });
         };
 
         self._getItemHash = function(item) {
             var data = getImageData(item);
-            var hash = sha1(data);
+            var hash = sha1(item.id);
             return hash;
         };
 
@@ -65,9 +71,24 @@ var Logger = require('./lib/logger.js');
             self._messenger.send('update', hashes);
         };
 
+        self._initLookup = function() {
+            for (var hash in self._items) {
+                self.load(hash, self._items[hash]);
+            }
+        };
+
         self._lookup = function(hash) {
             self._messenger.send('lookup', hash);
         };
+
+        self._loadImageByCDN = function(hash) {
+            var id = self._items[hash];
+            var element = document.getElementById(id);
+            element.onload = function() {
+                self._update([hash]);
+            };
+            element.src = element.dataset.webcdnFallback;
+        }
     };
 
     // helpers

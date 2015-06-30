@@ -8,16 +8,16 @@ inherits(Messenger, EventEmitter);
 function Messenger() {
     EventEmitter.call(this);
     this.socket = null;
-    this.pc = null;
-    this.sendChannel = null;
 };
 
 Messenger.prototype.send = function(type, data, receiver) {
     var msg = {
         type: type,
-        to: receiver,
         data: data
     };
+    if (receiver) {
+        msg.to = receiver;
+    }
     var s_msg = JSON.stringify(msg);
     this.socket.send(s_msg);
 };
@@ -49,7 +49,7 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
     self.socket.onmessage = function(event) {
         var msg = JSON.parse(event.data);
         if (msg.type === "relay" && msg.data) {
-            self._handleRelayMessage(msg.data);
+            self._handleRelayMessage(msg);
         }
         if (msg.type === "lookup-response" && msg.data) {
             self._handleLookupResponse(msg.data);
@@ -57,7 +57,6 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
     };
 
     self.socket.onopen = function(event) {
-        // TODO initPeerConnection();
         callback();
     };
 

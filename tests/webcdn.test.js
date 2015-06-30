@@ -2,7 +2,6 @@ window.WebSocket = MockSocket;
 
 var expect = chai.expect;
 var updateMessage = '{"type":"update","data":["123456","125355"]}';
-
 var uuid = "1234";
 
 describe('WebCDN', function() {
@@ -29,7 +28,7 @@ describe('WebCDN', function() {
         it('should return a hash for a DOM element', function() {
             var imageNode = document.querySelector('[data-webcdn-fallback]');
             var hash = self.webcdn._getItemHash(imageNode);
-            expect(hash).to.equal('9be2d5a9a52ee415ac31fa0c01e41b05d969e8c4');
+            expect(hash).to.equal('da39a3ee5e6b4b0d3255bfef95601890afd80709');
         });
     });
 
@@ -45,14 +44,18 @@ describe('WebCDN', function() {
 
     describe('.update', function() {
         it('should send a update message to the coordinator', function(done) {
+
             mockServer.on('message', function(data) {
                 var msg = JSON.parse(data);
                 expect(msg.type).to.be.equal('update');
                 expect(msg.data).to.equal('["123456","125355"]');
                 done();
             });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
-            self.webcdn._update('["123456","125355"]');
+
+            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+                self.webcdn._update('["123456","125355"]');
+            });
+
         });
     });
 
@@ -64,18 +67,9 @@ describe('WebCDN', function() {
                 expect(msg.data).to.equal('123456');
                 done();
             });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
-            self.webcdn._lookup('123456');
-        });
-    });
-
-    describe('.handleLookupResponse', function() {
-        it('should receive a lookup response from the coordinator', function(done) {
-            mockServer.on('connection', function(server) {
-                server.send({"type": "lookup-response", "data" : "peer_id"});
-                done();
+            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+                self.webcdn._lookup('123456');
             });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
         });
     });
 
