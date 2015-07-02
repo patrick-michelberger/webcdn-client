@@ -23,8 +23,7 @@ var Logger = require('./lib/logger.js');
 
         self._messenger.on('lookup-response', function(data) {
             if (data.peerid) {
-                // TODO create datachannel self._peernet.createConnection(data.peerid);
-                var peer = self._peernet.createConnection(data.peerid);
+                var peer = self._peernet.createConnection(data.peerid, data.hash);
                 peer.doOffer();
             } else {
                 // CDN Fallback
@@ -62,7 +61,6 @@ var Logger = require('./lib/logger.js');
         };
 
         self._getItemHash = function(item) {
-            var data = getImageData(item);
             var hash = sha1(item.id);
             return hash;
         };

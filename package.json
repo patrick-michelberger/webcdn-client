@@ -36,6 +36,7 @@
     "sinon-chai": "^2.8.0"
   },
   "dependencies": {
+    "get-browser-rtc": "^1.0.0",
     "sha1": "^1.1.1"
   }
 }
