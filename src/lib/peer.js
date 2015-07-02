@@ -49,7 +49,8 @@ Peer.prototype._createPeerConnection = function() {
     var self = this;
     var servers = {
         iceServers: [{
-            url: this._stunUrl
+            url: this._stunUrl,
+            urls: [this._stunUrl]
         }]
     };
     var constraints = {
@@ -123,7 +124,6 @@ Peer.prototype._handleMessage = function(event) {
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
         logger.trace("Image received", msg.hash);
-        console.log("this._imageData: ", this._imageData);
         endimage.src = this._imageData[msg.hash];
         delete this._imageData[msg.hash];
         this.emit('update', msg.hash);
