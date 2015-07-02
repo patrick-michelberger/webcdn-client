@@ -16,6 +16,7 @@ function Peer(options) {
     this._pc = null;
     this._signalChannel = options.signalChannel;
     this._reveiveChannel = null;
+    this._isConnected = false;
     this._sendChannel = null;
     this._imageData = {};
     this.init();
@@ -53,10 +54,7 @@ Peer.prototype._createPeerConnection = function() {
             urls: [this._stunUrl]
         }]
     };
-    var constraints = {
-        optional: []
-    };
-
+    var constraints = {}
     var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
     var name = "peerConnection_" + this._id;
     pc.onconnecting = this._createEventHandler(name + " onconnecting");
@@ -72,8 +70,8 @@ Peer.prototype._createPeerConnection = function() {
 Peer.prototype._createDataChannel = function(pc, label) {
     console.log("create data channel with label: ", label);
     var self = this;
-    var constrains = {};
-    var dc = self._pc.createDataChannel(label, constrains);
+    var constraints = {};
+    var dc = self._pc.createDataChannel(label, constraints);
     var name = "dataChannel";
     dc.onclose = function() {
         logger.trace("dataChannel close");
@@ -142,30 +140,28 @@ Peer.prototype._relay = function(data) {
 
 Peer.prototype.doOffer = function() {
     var self = this;
-    var mediaConstraints = {
-        optional: [{
-            RtpDataChannels: true
-        }]
-    };
-    self._pc.createOffer(function(sessionDescription) {
-        self._setLocalAndSendMessage.call(self, sessionDescription);
-    }, function(err) {
-        logger.trace("createOffer error", err);
-    }, mediaConstraints);
+    var constraints = {};
+    if (!self._isConnected) {
+        console.log("DO OFFER");
+        self._isConnected = true;
+        self._pc.createOffer(function(sessionDescription) {
+            self._isConnected = true;
+            self._setLocalAndSendMessage.call(self, sessionDescription);
+        }, function(err) {
+            self._isConnected = false;
+            logger.trace("createOffer error", err);
+        }, constraints);
+    }
 };
 
 Peer.prototype.doAnswer = function() {
     var self = this;
-    var mediaConstraints = {
-        optional: [{
-            RtpDataChannels: true
-        }]
-    };
-    self._pc.createAnswer(function(sessionDescription) {
-        self._setLocalAndSendMessage.call(self, sessionDescription);
-    }, function(err) {
-        logger.trace("createAnswer error", err);
-    }, mediaConstraints);
+    var constraints = {};
+        self._pc.createAnswer(function(sessionDescription) {
+            self._setLocalAndSendMessage.call(self, sessionDescription);
+        }, function(err) {
+            logger.trace("createAnswer error", err);
+        }, constraints);
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
