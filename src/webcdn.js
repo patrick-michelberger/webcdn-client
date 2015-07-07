@@ -1,5 +1,4 @@
 'use strict';
-
 var sha1 = require('sha1');
 var Messenger = require('./lib/messenger.js');
 var Peernet = require('./lib/peernet.js');
@@ -11,9 +10,10 @@ var Logger = require('./lib/logger.js');
 
     function WebCDN(config) {
         // Private attributes
+        config = config ||  {};
         var self = this;
         var events = [];
-
+        this._bucketUrl = config.bucketUrl ||  false;
         this._items = {};
         this._hashes = [];
         this._messenger = new Messenger();
@@ -61,7 +61,7 @@ var Logger = require('./lib/logger.js');
         };
 
         self._getItemHash = function(item) {
-            var hash = sha1(item.id);
+            var hash = sha1(item.dataset.webcdnFallback);
             return hash;
         };
 
@@ -80,12 +80,21 @@ var Logger = require('./lib/logger.js');
         };
 
         self._loadImageByCDN = function(hash) {
-            var id = self._items[hash];
-            var element = document.getElementById(id);
+            var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
             element.onload = function() {
                 self._update([hash]);
             };
-            element.src = element.dataset.webcdnFallback;
+            if (self._bucketUrl) {
+                if (element.dataset.webcdnFallback.charAt(0) === '/') {
+                    element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
+                }
+                element.dataset.webcdnFallback = self._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
+            }
+            getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
+                element.src = base64;
+            }, function() {
+                element.src = element.dataset.webcdnFallback;
+            });
         }
     };
 
@@ -99,6 +108,34 @@ var Logger = require('./lib/logger.js');
         var data = canvas.toDataURL("image/jpeg");
         return data;
     };
+
+    function getBase64FromImage(url, onSuccess, onError) {
+        var xhr = new XMLHttpRequest();
+        xhr.responseType = "arraybuffer";
+        xhr.open("GET", url);
+        xhr.onload = function() {
+            var base64, binary, bytes, mediaType;
+
+            bytes = new Uint8Array(xhr.response);
+            //NOTE String.fromCharCode.apply(String, ...
+            //may cause "Maximum call stack size exceeded"
+            binary = [].map.call(bytes, function(byte) {
+                return String.fromCharCode(byte);
+            }).join('');
+            mediaType = xhr.getResponseHeader('content-type');
+            base64 = [
+                'data:',
+                mediaType ? mediaType + ';' : '',
+                'base64,',
+                btoa(binary)
+            ].join('');
+            onSuccess(base64);
+        };
+        xhr.onerror = onError;
+        xhr.send();
+    };
+
+
 
     window.WebCDN = WebCDN;
 })(window);

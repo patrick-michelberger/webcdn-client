@@ -195,21 +195,11 @@ Peer.prototype._createEventHandler = function(name) {
 
 Peer.prototype._sendImage = function(hash) {
     var self = this;
-    //var selector = '[data-webcdn-fallback]';
-
     var imageToShare = document.querySelector('[data-webcdn-hash="' + hash + '"]');
-    //var url = imageToShare.getAttribute("src");
-
-    var canvas = document.createElement('canvas');
-    canvas.width = imageToShare.width;
-    canvas.height = imageToShare.height;
-    var context = canvas.getContext('2d');
-    context.drawImage(imageToShare, 0, 0, imageToShare.width, imageToShare.height);
-
     var delay = 10;
     var charSlice = 10000;
     var terminator = "\n";
-    var data = canvas.toDataURL("image/jpeg");
+    var data = imageToShare.src;
     var dataSent = 0;
     var intervalID = 0;
 
