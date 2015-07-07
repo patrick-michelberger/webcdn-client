@@ -28,7 +28,7 @@ describe('WebCDN', function() {
         it('should return a hash for a DOM element', function() {
             var imageNode = document.querySelector('[data-webcdn-fallback]');
             var hash = self.webcdn._getItemHash(imageNode);
-            expect(hash).to.equal('da39a3ee5e6b4b0d3255bfef95601890afd80709');
+            expect(hash).to.equal('ac6b069f0c45bf429464432ad60127984377b1a8');
         });
     });
 
