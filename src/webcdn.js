@@ -23,7 +23,6 @@ var Logger = require('./lib/logger.js');
 
         self._messenger.on('lookup-response', function(data) {
             if (data.peerid) {
-                console.log("lookup-response: ", data);
                 var peer = self._peernet.createConnection(data.peerid, data.hash);
                 peer.doOffer();
             } else {

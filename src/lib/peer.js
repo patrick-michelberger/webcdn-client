@@ -125,6 +125,7 @@ Peer.prototype._handleMessage = function(event) {
     } else if (msg.data == "\n") {
         logger.trace("Image received", msg.hash);
         endimage.src = this._imageData[msg.hash];
+        endimage.classList.add('webcdn-loaded');
         delete this._imageData[msg.hash];
         this.emit('update', msg.hash);
     } else if (msg.type === 'fetch-response') {

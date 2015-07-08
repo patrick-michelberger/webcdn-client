@@ -41,6 +41,50 @@ describe('WebCDN', function() {
             expect(hash).to.equal('783b7477e2fb5b827556947d9a71fae24d699740');
         });
     });
+    
+    describe('.load', function() {
+        it('should load a resource via WebRTC DataChannel', function(done) {
+            var hash = "783b7477e2fb5b827556947d9a71fae24d699740";
+            mockServer.on('connection', function(server) {
+                mockServer.on('message', function(data) {
+                    var msg = JSON.parse(data);
+                    if (msg.type === "relay") {
+                        if (msg.data.type === 'offer') {
+                            var matches = /\?id=(.*)/g.exec(server.url);
+                            var uuid = matches[1];
+                            msg.from = "1234";
+                        }
+                        if (msg.data.type === 'answer') {
+                            msg.from = "65a33500-35bd-4c3f-9103-a6fe48d42a3b";
+                        }
+                        if (msg.data.type === 'candidate') {
+                            msg.from = "1234";
+                        }
+                    } else if (msg.type === "lookup") {
+                        msg = JSON.parse(lookupResponseMessage);
+                    }
+                    server.send(JSON.stringify(msg));
+                });
+            });
+
+            // peer 2
+            var peer2 = new WebCDN();
+            peer2.connect('ws://localhost:8080?id=' + uuid, function() {
+
+            });
+
+            // peer 1
+            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+                self.webcdn.load(hash);
+                setTimeout(function() {
+                    var image = document.querySelector('[data-webcdn-hash="' + hash + '"]');
+                    expect(image.classList.contains('webcdn-loaded')).to.be.true;
+                    done();
+                }, 400);
+            });
+
+        });
+    });
 
     describe('._initLookup', function() {
         it('should send three initial lookup requests to the coordinator', function(done) {
@@ -102,58 +146,9 @@ describe('WebCDN', function() {
                 setTimeout(function() {
                     expect(image.src).not.to.be.empty;
                     done();
-                }, 20);
+                }, 40);
             });
         });
     });
 
-    describe('._load', function() {
-        it('should send a lookup request to the coordinator', function(done) {
-            mockServer.on('message', function(data) {
-                var msg = JSON.parse(data);
-                expect(msg.type).to.be.equal('lookup');
-                expect(msg.data).to.equal('783b7477e2fb5b827556947d9a71fae24d699740');
-                done();
-            });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn.load("783b7477e2fb5b827556947d9a71fae24d699740");
-            });
-
-            /** TODO 
-                        var msg = JSON.parse(lookupResponseMessage).data;
-
-            // Mocking relay server
-            mockServer.on('connection', function(server) {
-                mockServer.on('message', function(data) {
-                    var msg = JSON.parse(data);
-                    if (msg.type === "relay" && msg.data.type === 'offer') {
-                        var matches = /\?id=(.*)/g.exec(server.url);
-                        var uuid = matches[1];
-                        msg.from = "1234";
-                    }
-                    if (msg.type === "relay" && msg.data.type === 'answer') {
-                        msg.from = "65a33500-35bd-4c3f-9103-a6fe48d42a3b";
-                    }
-                    if (msg.type === "relay" && msg.data.type === 'candidate') {
-                        msg.from = "1234";
-                    }
-                    server.send(JSON.stringify(msg));
-                });
-            });
-
-            // peer 2
-            var peer2 = new WebCDN();
-            peer2.connect('ws://localhost:8080?id=' + uuid, function() {
-
-            });
-
-            // peer 1
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
-                var peer = self.webcdn._peernet.createConnection(msg.peerid, msg.hash);
-                peer.doOffer();
-            });
-**/
-
-        });
-    });
 });
