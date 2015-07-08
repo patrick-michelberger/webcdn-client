@@ -23,6 +23,7 @@ var Logger = require('./lib/logger.js');
 
         self._messenger.on('lookup-response', function(data) {
             if (data.peerid) {
+                console.log("lookup-response: ", data);
                 var peer = self._peernet.createConnection(data.peerid, data.hash);
                 peer.doOffer();
             } else {
@@ -45,8 +46,7 @@ var Logger = require('./lib/logger.js');
             });
         };
 
-        self.load = function(content_hash, id) {
-            var elem = document.getElementById(id);
+        self.load = function(content_hash) {
             self._lookup(content_hash);
         };
 
@@ -71,7 +71,7 @@ var Logger = require('./lib/logger.js');
 
         self._initLookup = function() {
             for (var hash in self._items) {
-                self.load(hash, self._items[hash]);
+                self.load(hash);
             }
         };
 

@@ -48,16 +48,16 @@ Peernet.prototype._handleRelayMessage = function(data) {
     var started = true;
     var self = this;
     if (msg && msg.data && msg.data.type === 'offer') {
-        // logger.trace("offer from: ", data.from);
+        //logger.trace("offer from: ", msg.from);
         var peer = this.createConnection(data.from);
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
-        // logger.trace("answer from: ", data.from);
+        //logger.trace("answer from: ", msg.from);
         var peer = this.createConnection(data.from);
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
     } else if (msg && msg.data && msg.data.type === 'candidate' && started) {
-        // logger.trace("candidate from: ", data.from);
+        //logger.trace("candidate from: ", data.from);
         var candidate = new self._wrtc.RTCIceCandidate({
             candidate: msg.data.candidate
         });

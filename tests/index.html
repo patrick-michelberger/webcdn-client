@@ -7,16 +7,14 @@ break anything with or without it. -->
 <div id="mocha"></div>
 <!-- This is where any fixtures we need for the test will be inserted into. Naturally, we won't want to cover the mocha test results so we position this bad boy off screen. -->
 <div id="test" style="position: fixed; top: 0; left: -99999px;">
-    <img data-webcdn-fallback="images/example_image_1.jpeg" class="img-responsive" />
-    <img data-webcdn-fallback="images/example_image_2.jpeg" class="img-responsive" />
-    <img data-webcdn-fallback="images/example_image_3.jpeg" class="img-responsive" />
+    <img data-webcdn-fallback="data/images/example_image_1.jpeg" class="img-responsive" />
+    <img data-webcdn-fallback="data/images/example_image_2.jpeg" class="img-responsive" />
+    <img data-webcdn-fallback="data/images/example_image_3.jpeg" class="img-responsive" />
 </div>
 <!-- We need to insert our testing dependencies here -->
 <script src="../node_modules/mocha/mocha.js"></script>
 <script src="../node_modules/chai/chai.js"></script>
-<script src="../node_modules/sinon/pkg/sinon.js"></script>
-<script src="../node_modules/sinon-chai/lib/sinon-chai.js"></script>
-<script src="../bower_components/mock-socket/dist/mock-socket.min.js"></script>
+<script src="../bower_components/mock-socket/dist/mock-socket.js"></script>
 <script>
 mocha.setup('bdd');
 mocha.reporter('html');

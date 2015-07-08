@@ -77,7 +77,9 @@ Peer.prototype._createDataChannel = function(pc, label) {
         logger.trace("dataChannel close");
         self._createEventHandler(name + " onclose");
     };
-    dc.onerror = self._createEventHandler(name + " onerror");
+    dc.onerror = function(err) {
+        console.log("dc.onerror: ", err);
+    };
     dc.onmessage = function(event) {
         self._handleMessage.call(self, event);
     };
