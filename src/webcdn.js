@@ -134,7 +134,5 @@ var Logger = require('./lib/logger.js');
         xhr.send();
     };
 
-
-
     window.WebCDN = WebCDN;
 })(window);

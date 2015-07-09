@@ -37,6 +37,9 @@ Peernet.prototype.createConnection = function(peerId, hash) {
         this._peers[peerId].on('update', function(hash) {
             self._signalChannel.send('update', [hash]);
         });
+        this._peers[peerId].on('upload_ratio', function(data) {
+            self._signalChannel.send('upload_ratio', data);
+        });
     } else {
         this._peers[peerId].addHash(hash);
     }

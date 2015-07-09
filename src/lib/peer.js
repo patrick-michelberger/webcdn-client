@@ -30,7 +30,7 @@ Peer.prototype.addHash = function(hash) {
 
 Peer.prototype.init = function() {
     var self = this;
-    var label = "DC_LABEL_" + self._id;
+    var label = self._id;
     self._pc = self._createPeerConnection();
     self._pc.onicecandidate = function(event) {
         self._iceCallback.call(self, event);
@@ -126,8 +126,16 @@ Peer.prototype._handleMessage = function(event) {
         logger.trace("Image received", msg.hash);
         endimage.src = this._imageData[msg.hash];
         endimage.classList.add('webcdn-loaded');
+        var base64 = this._imageData[msg.hash].replace('data:application/octet-stream;base64,', '');
+        var base64_byte = base64.length * 6 / 8;
         delete this._imageData[msg.hash];
         this.emit('update', msg.hash);
+        this.emit('upload_ratio', {
+            "from" : this._id,
+            "to" : event.target.label,
+            "hash" : msg.hash,
+            "size" : base64_byte
+        });
     } else if (msg.type === 'fetch-response') {
         if (!this._imageData[msg.hash]) {
             this._imageData[msg.hash] = msg.data;
