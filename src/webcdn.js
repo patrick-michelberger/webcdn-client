@@ -3,6 +3,7 @@ var sha1 = require('sha1');
 var Messenger = require('./lib/messenger.js');
 var Peernet = require('./lib/peernet.js');
 var Logger = require('./lib/logger.js');
+var getCurrentPosition = require('./lib/geo.js');
 
 (function(window) {
 
@@ -35,6 +36,7 @@ var Logger = require('./lib/logger.js');
             self.connect(coordinatorUrl, function() {
                 self._initHashing();
                 self._initLookup();
+                self._sendGeolocation();
                 callback();
             });
         };
@@ -94,7 +96,15 @@ var Logger = require('./lib/logger.js');
             }, function() {
                 element.src = element.dataset.webcdnFallback;
             });
-        }
+        };
+
+        self._sendGeolocation = function() {
+            getCurrentPosition(function(err, position) {
+                if (!err && position) {
+                    self._messenger.send('geolocation', position);
+                } 
+            });
+        };
     };
 
     // helpers
