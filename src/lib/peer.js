@@ -131,12 +131,13 @@ Peer.prototype._handleMessage = function(event) {
         delete this._imageData[msg.hash];
         this.emit('update', msg.hash);
         this.emit('upload_ratio', {
-            "from" : this._id,
-            "to" : event.target.label,
-            "hash" : msg.hash,
-            "size" : base64_byte
+            "from": this._id,
+            "to": event.target.label,
+            "hash": msg.hash,
+            "size": base64_byte
         });
     } else if (msg.type === 'fetch-response') {
+        console.log("msg.data: ", msg);
         if (!this._imageData[msg.hash]) {
             this._imageData[msg.hash] = msg.data;
         } else {
@@ -168,11 +169,11 @@ Peer.prototype.doOffer = function() {
 Peer.prototype.doAnswer = function() {
     var self = this;
     var constraints = {};
-        self._pc.createAnswer(function(sessionDescription) {
-            self._setLocalAndSendMessage.call(self, sessionDescription);
-        }, function(err) {
-            logger.trace("createAnswer error", err);
-        }, constraints);
+    self._pc.createAnswer(function(sessionDescription) {
+        self._setLocalAndSendMessage.call(self, sessionDescription);
+    }, function(err) {
+        logger.trace("createAnswer error", err);
+    }, constraints);
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
