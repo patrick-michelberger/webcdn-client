@@ -1,20 +1,24 @@
 'use strict';
 var sha1 = require('sha1');
+var UUID = require('./lib/uuid.js');
 var Messenger = require('./lib/messenger.js');
 var Peernet = require('./lib/peernet.js');
 var Logger = require('./lib/logger.js');
 var getCurrentPosition = require('./lib/geo.js');
+var EventEmitter = require('events').EventEmitter;
+var inherits = require('util').inherits;
 
 (function(window) {
 
     window.logger = new Logger();
 
+    inherits(WebCDN, EventEmitter);
+    
     function WebCDN(config) {
-        // Private attributes
         config = config ||  {};
         var self = this;
-        var events = [];
         this._bucketUrl = config.bucketUrl ||  false;
+        this._trackGeolocation = config.trackGeolocation ||  false;
         this._items = {};
         this._hashes = [];
         this._messenger = new Messenger();
@@ -22,7 +26,7 @@ var getCurrentPosition = require('./lib/geo.js');
             signalChannel: this._messenger
         });
 
-        self._messenger.on('lookup-response', function(data) {
+        this._messenger.on('lookup-response', function(data) {
             if (data.peerid) {
                 var peer = self._peernet.createConnection(data.peerid, data.hash);
                 peer.doOffer();
@@ -31,81 +35,107 @@ var getCurrentPosition = require('./lib/geo.js');
                 self._loadImageByCDN(data.hash);
             }
         });
+    };
 
-        self.init = function(coordinatorUrl, callback) {
+    WebCDN.prototype.init = function(coordinatorUrl, callback) {
+        var self = this;
+        var id = getQueryId(coordinatorUrl)
+
+        this.uuid = id ||  UUID();
+        if (!id) {
+            coordinatorUrl += "?id=" + self.uuid;
+        }
+
+        if (this._trackGeolocation) {
+            this.emit('geolocation:start');
+            getCurrentPosition(function(err, position) {
+                self.emit('geolocation:end');
+                if (!err && position) {
+                    coordinatorUrl += '&lat=' + position.latitude + '&lon=' + position.longitude;
+                }
+                connect(callback);
+            });
+        } else {
+            connect(callback);
+        }
+
+        function connect(callback) {
             self.connect(coordinatorUrl, function() {
                 self._initHashing();
                 self._initLookup();
-                self._sendGeolocation();
                 callback();
-            });
-        };
-
-        self.connect = function(coordinatorUrl, callback) {
-            self._messenger.connect(coordinatorUrl, function() {
-                callback();
-            });
-        };
-
-        self.load = function(content_hash) {
-            self._lookup(content_hash);
-        };
-
-        self._initHashing = function() {
-            var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
-            items.forEach(function(item) {
-                var hash = self._getItemHash(item);
-                self._hashes.push(hash);
-                self._items[hash] = item.id;
-                item.dataset.webcdnHash = hash;
-            });
-        };
-
-        self._getItemHash = function(item) {
-            var hash = sha1(item.dataset.webcdnFallback);
-            return hash;
-        };
-
-        self._update = function(hashes) {
-            self._messenger.send('update', hashes);
-        };
-
-        self._initLookup = function() {
-            for (var hash in self._items) {
-                self.load(hash);
-            }
-        };
-
-        self._lookup = function(hash) {
-            self._messenger.send('lookup', hash);
-        };
-
-        self._loadImageByCDN = function(hash) {
-            var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
-            element.onload = function() {
-                self._update([hash]);
-            };
-            if (self._bucketUrl) {
-                if (element.dataset.webcdnFallback.charAt(0) === '/') {
-                    element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
-                }
-                element.dataset.webcdnFallback = self._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
-            }
-            getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
-                element.src = base64;
-            }, function() {
-                element.src = element.dataset.webcdnFallback;
-            });
-        };
-
-        self._sendGeolocation = function() {
-            getCurrentPosition(function(err, position) {
-                if (!err && position) {
-                    self._messenger.send('geolocation', position);
-                } 
             });
         };
     };
+
+    WebCDN.prototype.connect = function(coordinatorUrl, callback) {
+        this._messenger.connect(coordinatorUrl, function() {
+            callback();
+        });
+    };
+
+    WebCDN.prototype.load = function(content_hash) {
+        this._lookup(content_hash);
+    };
+
+    WebCDN.prototype._initHashing = function() {
+        var self = this;
+        var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
+        items.forEach(function(item) {
+            var hash = self._getItemHash(item);
+            self._hashes.push(hash);
+            self._items[hash] = item.id;
+            item.dataset.webcdnHash = hash;
+        });
+    };
+
+    WebCDN.prototype._getItemHash = function(item) {
+        var hash = sha1(item.dataset.webcdnFallback);
+        return hash;
+    };
+
+    WebCDN.prototype._update = function(hashes) {
+        this._messenger.send('update', hashes);
+    };
+
+    WebCDN.prototype._initLookup = function() {
+        for (var hash in this._items) {
+            this.load(hash);
+        }
+    };
+
+    WebCDN.prototype._lookup = function(hash) {
+        this._messenger.send('lookup', hash);
+    };
+
+    WebCDN.prototype._loadImageByCDN = function(hash) {
+        var self = this;
+        var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
+        element.onload = function() {
+            self._update([hash]);
+        };
+        if (this._bucketUrl) {
+            if (element.dataset.webcdnFallback.charAt(0) === '/') {
+                element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
+            }
+            element.dataset.webcdnFallback = this._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
+        }
+        getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
+            element.src = base64;
+        }, function() {
+            element.src = element.dataset.webcdnFallback;
+        });
+    };
+
+    WebCDN.prototype._sendGeolocation = function() {
+        var self = this;
+        getCurrentPosition(function(err, position) {
+            if (!err && position) {
+                self._messenger.send('geolocation', position);
+            }
+        });
+    };
+
 
     // helpers
     function getImageData(domElement) {
@@ -142,6 +172,16 @@ var getCurrentPosition = require('./lib/geo.js');
         };
         xhr.onerror = onError;
         xhr.send();
+    };
+
+    function getQueryId(url) {
+        var regex = /\?id=(\d*)/;
+        var result = regex.exec(url);
+        if (result && result[1]) {
+            return result[1];
+        } else {
+            return false;
+        }
     };
 
     window.WebCDN = WebCDN;

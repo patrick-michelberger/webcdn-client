@@ -1,4 +1,3 @@
-var UUID = require('./uuid.js');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 
@@ -24,11 +23,6 @@ Messenger.prototype.send = function(type, data, receiver) {
 
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
-    var id = getQueryId(coordinatorUrl)
-    this.uuid = id ||  UUID();
-    if (!id) {
-        coordinatorUrl += "?id=" + this.uuid;
-    }
     if (self.socket) {
         logger.trace("Socket exist, init fail.");
         callback();
@@ -73,14 +67,4 @@ Messenger.prototype._handleRelayMessage = function(data) {
 
 Messenger.prototype._handleLookupResponse = function(peerId) {
     this.emit('lookup-response', peerId);
-};
-
-function getQueryId(url) {
-    var regex = /\?id=(\d*)/;
-    var result = regex.exec(url);
-    if (result && result[1]) {
-        return result[1];
-    } else {
-        return false;
-    }
 };

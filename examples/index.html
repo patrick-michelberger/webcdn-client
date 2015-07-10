@@ -8,6 +8,7 @@
 </head>
 
 <body>
+    <div id="webcdn-alert" class="alert" style="display:none;"></div>
     <div class="container">
         <h3>Examples</h3>
         <div class="row">
@@ -27,9 +28,31 @@
         </div>
         <script>
         <!-- Example code goes here -->
+        // DOM elements
+        var alert = document.getElementById("webcdn-alert");
+
         var webcdn = new WebCDN({
-            "bucketUrl": "https://s3.eu-central-1.amazonaws.com/webcdn2/"
+            "bucketUrl": "https://s3.eu-central-1.amazonaws.com/webcdn2/",
+            "trackGeolocation": true
         });
+
+        // Event listeners
+        webcdn.on("geolocation:start", function()  {
+            alert.classList.add("alert-danger");
+            alert.innerHTML = "Requesting current geolocation ...";
+            alert.style.display = "block";
+        });
+
+        webcdn.on("geolocation:end", function()  {
+            alert.innerHTML = "Current geolocation received !";
+            alert.classList.remove("alert-danger");
+            alert.classList.add("alert-success");
+            setTimeout(function() {
+                alert.classList.remove("alert-success");
+                alert.style.display = "none";
+            }, 1500);
+        });
+
         webcdn.init('ws://' + location.hostname + ':1337', function() {
             console.log("WebCDN READY");
         });
