@@ -47,7 +47,7 @@ The following options are supported:
 
 ### WebCDN#init(coordinatorUrl:String [,callback:Function])
 
-Connects to a given coordinator server and fires optionally a callback `fn` with `err` signature (if any).  
+Connects to a given `coordinatorUrl` and fires optionally a callback `fn` with `err` signature (if any).  
 The client is automatically a peer of the WebCDN network identified with its uuid.
 
 ## Examples
