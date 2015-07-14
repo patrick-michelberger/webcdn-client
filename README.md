@@ -25,7 +25,15 @@ $ npm install webcdn-client
 
 ### WebCDN
 
+Exposed by including `webcdn.js`into your project.
+
 ### WebCDN()
+
+Creates a new `WebCDN` client:
+
+```js
+var webcdn = new WebCDN();
+```
 
 ### WebCDN(opts:Object)
 
