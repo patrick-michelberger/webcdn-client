@@ -21,3 +21,17 @@ or
 $ npm install webcdn-client
 ```
 
+## Examples
+
+To view the examples, clone the WebCDN repo and install the dependencies:
+
+```bash
+$ git clone git@github.com:pmichelberger/webcdn-client.git
+$ cd webcdn-client
+$ npm install
+```
+
+Then run `grunt` and visit `http://localhost:8000/examples`. Open the same URL via a second browser window and visit your browser network & console panel.
+
+## Tests
+
