@@ -37,6 +37,14 @@ var webcdn = new WebCDN();
 
 ### WebCDN(opts:Object)
 
+Optionally, the first argument of the `WebCDN` constructor can be an options object.
+
+The following options are supported:
+
+  - `bucketUrl` String - Set the root URL for static resource hosting (optional)
+  - `trackGeolocation` Boolean - Enable the HTML5 Geolocation API (optional)
+
+
 ### WebCDN#init(coordinatorUrl:String):void
 
 ## Examples
