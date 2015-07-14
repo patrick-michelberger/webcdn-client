@@ -1,4 +1,4 @@
-# webcdn-client
+# WebCDN Client
 client for a browser-based content distribution network using WebRTC
 
 ```js
