@@ -21,6 +21,16 @@ or
 $ npm install webcdn-client
 ```
 
+## API
+
+### WebCDN
+
+### WebCDN()
+
+### WebCDN(opts:Object)
+
+### WebCDN#init(coordinatorUrl:String):void
+
 ## Examples
 
 To view the examples, clone the WebCDN repo and install the dependencies:
