@@ -5,7 +5,7 @@
     "patrick_michelberger <pmichelberger@googlemail.com>"
   ],
   "description": "Client for a browser-based content distribution network using WebRTC",
-  "main": "dist/webcdn.js",
+  "main": "dist/webcdn.min.js",
   "keywords": [
     "CDN",
     "WebRTC",
