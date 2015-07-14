@@ -35,3 +35,9 @@ Then run `grunt` and visit `http://localhost:8000/examples`. Open the same URL v
 
 ## Tests
 
+To run the test suite, first install the dependencies, then run `npm test`:
+
+```bash
+$ npm install
+$ npm test
+```
