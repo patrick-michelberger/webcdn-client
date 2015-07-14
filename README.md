@@ -58,7 +58,7 @@ webcdn.init('ws://webcdn.michelberger.info:1337', function() {
 
 ### WebCDN#load(contentHash:String)
 
-Loads a specific resource identified by a unique `contentHash`, explicetly.
+Loads a specific resource identified by a unique `contentHash`, explicitly.
 
 ```js
 webcdn.load('35c22d5973cb21ae0887eda12185747e7a94cd74');
