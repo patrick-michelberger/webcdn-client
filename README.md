@@ -45,7 +45,10 @@ The following options are supported:
   - `trackGeolocation` Boolean - Enable the HTML5 Geolocation API (optional)
 
 
-### WebCDN#init(coordinatorUrl:String):void
+### WebCDN#init(coordinatorUrl:String [,callback:Function])
+
+Connects to a given coordinator server and fires optionally a callback `fn` with `err` signature (if any).  
+The client is automatically a peer of the WebCDN network identified with its uuid.
 
 ## Examples
 
