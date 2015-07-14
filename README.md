@@ -50,6 +50,20 @@ The following options are supported:
 Connects to a given `coordinatorUrl` and fires optionally a `callback` function with `error` signature (if any).  
 The client is automatically a peer of the WebCDN network identified with its uuid.
 
+```js
+webcdn.init('ws://webcdn.michelberger.info:1337', function() {
+  console.log("Your WebCDN is ready!");
+});
+```
+
+### WebCDN#load(contentHash:String)
+
+Loads a specific resource identified by a unique `contentHash`, explicetly.
+
+```js
+webcdn.load('35c22d5973cb21ae0887eda12185747e7a94cd74');
+```
+
 ## Examples
 
 To view the examples, clone the WebCDN repo and install the dependencies:
