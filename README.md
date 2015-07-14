@@ -35,9 +35,9 @@ Then run `grunt` and visit `http://localhost:8000/examples`. Open the same URL v
 
 ## Tests
 
-To run the test suite, first install the dependencies, then run `npm test`:
+To run the test suite, first install the dependencies, then run `grunt` and visit `http:localhost:8000/tests`:
 
 ```bash
-$ npm install
-$ npm test
+$ npm install && bower install
+$ grunt
 ```
