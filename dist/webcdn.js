@@ -3071,6 +3071,8 @@ function Peer(options) {
     this._isConnected = false;
     this._sendChannel = null;
     this._imageData = {};
+    this._otherCandidates = [];
+    this._otherSDP = false;
     this.init();
 };
 
@@ -3189,7 +3191,6 @@ Peer.prototype._handleMessage = function(event) {
             "size": base64_byte
         });
     } else if (msg.type === 'fetch-response') {
-        console.log("msg.data: ", msg);
         if (!this._imageData[msg.hash]) {
             this._imageData[msg.hash] = msg.data;
         } else {
@@ -3223,9 +3224,25 @@ Peer.prototype.doAnswer = function() {
     var constraints = {};
     self._pc.createAnswer(function(sessionDescription) {
         self._setLocalAndSendMessage.call(self, sessionDescription);
+        for (var i = 0; i < self._otherCandidates.length; i++) {
+            if (self._otherCandidates[i]) {
+                console.log("Peer.doAnswer: this_otherCandidates: ", self._otherCandidates[i]);
+                self._pc.addIceCandidate(self._otherCandidates[i]);
+            }
+        }
     }, function(err) {
         logger.trace("createAnswer error", err);
     }, constraints);
+};
+
+Peer.prototype.setIceCandidates = function(iceCandidate) {
+    console.log("setIceCandidates...: ", iceCandidate);
+    if (!this._otherSDP) {
+        this._otherCandidates.push(iceCandidate);
+    }
+    if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
+        this._pc.addIceCandidate(iceCandidate);
+    }
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
@@ -3321,6 +3338,7 @@ function Peernet(options) {
 
 Peernet.prototype.createConnection = function(peerId, hash) {
     var self = this;
+    console.log("Peernet.createConnection(peerId, hash): ", peerId);
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,
@@ -3349,19 +3367,29 @@ Peernet.prototype._handleRelayMessage = function(data) {
     if (msg && msg.data && msg.data.type === 'offer') {
         //logger.trace("offer from: ", msg.from);
         var peer = this.createConnection(data.from);
+        peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
+        console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
         //logger.trace("answer from: ", msg.from);
         var peer = this.createConnection(data.from);
+        peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
+        console.log("answer: ", peer._otherCandidates);
+        for (var i = 0; i < peer._otherCandidates.length; i++) {
+            if (peer._otherCandidates[i]) {
+                console.log("handle 'answer': this_otherCandidates: ", peer._otherCandidates[i]);
+                peer._pc.addIceCandidate(peer._otherCandidates[i]);
+            }
+        }
     } else if (msg && msg.data && msg.data.type === 'candidate' && started) {
         //logger.trace("candidate from: ", data.from);
         var candidate = new self._wrtc.RTCIceCandidate({
             candidate: msg.data.candidate
         });
-        var peer = this.createConnection(data.from);
-        peer._pc.addIceCandidate(candidate);
+        var peer = this._peers[data.from];
+        peer.setIceCandidates(candidate);
     } else if (msg && msg.data && msg.data.type === 'bye') {
         // TODO onRemoteHangup();
         logger.trace('Hangup');
