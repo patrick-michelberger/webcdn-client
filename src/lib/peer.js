@@ -19,6 +19,8 @@ function Peer(options) {
     this._isConnected = false;
     this._sendChannel = null;
     this._imageData = {};
+    this._otherCandidates = [];
+    this._otherSDP = false;
     this.init();
 };
 
@@ -137,7 +139,6 @@ Peer.prototype._handleMessage = function(event) {
             "size": base64_byte
         });
     } else if (msg.type === 'fetch-response') {
-        console.log("msg.data: ", msg);
         if (!this._imageData[msg.hash]) {
             this._imageData[msg.hash] = msg.data;
         } else {
@@ -171,9 +172,25 @@ Peer.prototype.doAnswer = function() {
     var constraints = {};
     self._pc.createAnswer(function(sessionDescription) {
         self._setLocalAndSendMessage.call(self, sessionDescription);
+        for (var i = 0; i < self._otherCandidates.length; i++) {
+            if (self._otherCandidates[i]) {
+                console.log("Peer.doAnswer: this_otherCandidates: ", self._otherCandidates[i]);
+                self._pc.addIceCandidate(self._otherCandidates[i]);
+            }
+        }
     }, function(err) {
         logger.trace("createAnswer error", err);
     }, constraints);
+};
+
+Peer.prototype.setIceCandidates = function(iceCandidate) {
+    console.log("setIceCandidates...: ", iceCandidate);
+    if (!this._otherSDP) {
+        this._otherCandidates.push(iceCandidate);
+    }
+    if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
+        this._pc.addIceCandidate(iceCandidate);
+    }
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
