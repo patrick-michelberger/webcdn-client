@@ -4,6 +4,7 @@ var UUID = require('./lib/uuid.js');
 var Messenger = require('./lib/messenger.js');
 var Peernet = require('./lib/peernet.js');
 var Logger = require('./lib/logger.js');
+var Statistics = require('./lib/statistics.js');
 var getCurrentPosition = require('./lib/geo.js');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
@@ -45,6 +46,12 @@ var inherits = require('util').inherits;
         if (!id) {
             coordinatorUrl += "?id=" + self.uuid;
         }
+
+        this.statistics = new Statistics({
+            host: "localhost",
+            wsPort: "1337",
+            uuid: this.uuid
+        });
 
         if (this._trackGeolocation) {
             this.emit('geolocation:start');
