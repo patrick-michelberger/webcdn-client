@@ -4,7 +4,6 @@ function Statistics(settings) {
     settings = settings || {};
     this._host = settings.host || "webcdn-mediator.herokuapp.com";
     this._httpPort = settings.httpPort || "80";
-    this._wsPort = settings.wsPort ||  "1337";
     this._uuid = settings.uuid ||  false;
     this.init();
 };
@@ -15,7 +14,7 @@ Statistics.prototype.init = function() {
 
 Statistics.prototype.initWebsocket = function() {
     var self = this,
-        url = "ws://" + self._host + ':' + self._wsPort + "?id=" + self._uuid;
+        url = "ws://" + self._host + "?id=" + self._uuid;
 
     if (self.socket) {
         logger.trace("Socket exist, init fail.");

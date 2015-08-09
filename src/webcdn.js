@@ -48,8 +48,6 @@ var inherits = require('util').inherits;
         }
 
         this.statistics = new Statistics({
-            host: "localhost",
-            wsPort: "1337",
             uuid: this.uuid
         });
 
