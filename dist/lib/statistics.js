@@ -36,7 +36,6 @@ Statistics.prototype.initWebsocket = function() {
     };
 
     self.socket.onopen = function(event) {
-        console.log("Websocket connection open to : ", self._host);
         self.addHost();
     };
 };
