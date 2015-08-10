@@ -1,6 +1,8 @@
 'use strict';
+
+window.webcdn_uuid = require('./lib/uuid.js')();
+
 var sha1 = require('sha1');
-var UUID = require('./lib/uuid.js');
 var Messenger = require('./lib/messenger.js');
 var Peernet = require('./lib/peernet.js');
 var Logger = require('./lib/logger.js');
@@ -14,7 +16,7 @@ var inherits = require('util').inherits;
     window.logger = new Logger();
 
     inherits(WebCDN, EventEmitter);
-    
+
     function WebCDN(config) {
         config = config ||  {};
         var self = this;
@@ -28,7 +30,9 @@ var inherits = require('util').inherits;
         });
 
         this._messenger.on('lookup-response', function(data) {
+            Statistics.mark("lookup_end:" + data.hash);
             if (data.peerid) {
+                Statistics.mark("pc_connect_start:" + data.peerid);
                 var peer = self._peernet.createConnection(data.peerid, data.hash);
                 peer.doOffer();
             } else {
@@ -41,15 +45,10 @@ var inherits = require('util').inherits;
     WebCDN.prototype.init = function(coordinatorUrl, callback) {
         var self = this;
         var id = getQueryId(coordinatorUrl)
-
-        this.uuid = id ||  UUID();
+        this.uuid = id ||  window.webcdn_uuid;
         if (!id) {
             coordinatorUrl += "?id=" + self.uuid;
         }
-
-        this.statistics = new Statistics({
-            uuid: this.uuid
-        });
 
         if (this._trackGeolocation) {
             this.emit('geolocation:start');
@@ -110,21 +109,25 @@ var inherits = require('util').inherits;
     };
 
     WebCDN.prototype._lookup = function(hash) {
+        Statistics.mark("lookup_start:" + hash);
         this._messenger.send('lookup', hash);
     };
 
     WebCDN.prototype._loadImageByCDN = function(hash) {
         var self = this;
         var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
-        element.onload = function() {
-            self._update([hash]);
-        };
+
         if (this._bucketUrl) {
             if (element.dataset.webcdnFallback.charAt(0) === '/') {
                 element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
             }
             element.dataset.webcdnFallback = this._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
         }
+
+        element.onload = function() {
+            Statistics.queryResourceTiming(this.dataset.webcdnFallback);
+            self._update([hash]);
+        };
         getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
             element.src = base64;
         }, function() {
