@@ -3052,6 +3052,7 @@ Messenger.prototype._handleLookupResponse = function(peerId) {
 },{"events":5,"util":9}],17:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+var Statistics = require('./statistics.js');
 
 module.exports = Peer;
 inherits(Peer, EventEmitter);
@@ -3139,6 +3140,8 @@ Peer.prototype._createDataChannel = function(pc, label) {
     };
     dc.onopen = function() {
         logger.trace("WebRTC DataChannel", "OPEN");
+        Statistics.mark("pc_connect_end:" + self._id);
+        Statistics.measure();
         self._fetchObjects();
     };
     return dc;
@@ -3168,6 +3171,7 @@ Peer.prototype._gotReceiveChannel = function(event) {
     };
     this._receiveChannel.onopen = function() {};
     this._receiveChannel.onclose = function() {};
+
 };
 
 Peer.prototype._handleMessage = function(event) {
@@ -3310,7 +3314,7 @@ Peer.prototype._sendImage = function(hash) {
 
 };
 
-},{"events":5,"util":9}],18:[function(require,module,exports){
+},{"./statistics.js":19,"events":5,"util":9}],18:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
@@ -3397,77 +3401,120 @@ Peernet.prototype._handleRelayMessage = function(data) {
 };
 
 },{"./peer.js":17,"events":5,"get-browser-rtc":10,"util":9}],19:[function(require,module,exports){
-module.exports = Statistics;
+var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
+var ws = createWebsocket();
 
-function Statistics(settings) {
-    settings = settings || {};
-    this._host = settings.host || "webcdn-mediator.herokuapp.com";
-    this._httpPort = settings.httpPort || "80";
-    this._uuid = settings.uuid ||  false;
-    this.init();
-};
+var Statistics = {};
 
-Statistics.prototype.init = function() {
-    this.initWebsocket();
-};
-
-Statistics.prototype.initWebsocket = function() {
-    var self = this,
-        url = "ws://" + self._host + "?id=" + self._uuid;
-
-    if (self.socket) {
-        logger.trace("Socket exist, init fail.");
-        return;
-    }
-
-    self.socket = new WebSocket(url);
-    self.socket.onclose = function(event) {
-        console.log("WebSocket.onclose", event);
-    };
-
-    self.socket.onerror = function(event) {
-        console.log("WebSocket.onerror", event);
-    };
-
-    self.socket.onmessage = function(event) {
-        var msg = JSON.parse(event.data);
-    };
-
-    self.socket.onopen = function(event) {
-        self.addHost();
-    };
-};
-
-Statistics.prototype.addHost = function() {
+Statistics.addHost = function() {
     var data = {
-        "uuid": this._uuid,
+        "uuid": window.webcdn_uuid,
         "active": true
     };
     if (window.performance && window.performance.timing) {
         data.performance = {};
         data.performance.timing = window.performance.timing.toJSON();
     }
-    this.sendMessage("host:add", data);
+    Statistics.sendMessage("host:add", data);
 };
 
-Statistics.prototype.removeHost = function() {
+Statistics.removeHost = function() {
     var data = {
-        "uuid": this._uuid
+        "uuid": window.webcdn_uuid
     };
-    this.sendMessage("host:remove", data);
+    Statistics.sendMessage("host:remove", data);
 };
 
-Statistics.prototype.sendMessage = function(type, data) {
+Statistics.sendMessage = function(type, data) {
     var message = {
         type: type,
         data: data
     };
-    this.socket.send(JSON.stringify(message));
+    ws.send(JSON.stringify(message));
 };
 
-Statistics.prototype.getHostStatus = function() {};
-Statistics.prototype.startPeer = function() {};
-Statistics.prototype.abortPeer = function() {};
+Statistics.queryResourceTiming = function(name) {
+    if (!('performance' in window) ||
+        !('getEntriesByType' in window.performance) ||
+        !(window.performance.getEntriesByType('resource') instanceof Array)
+    ) {
+        // API not supported
+    } else {
+        // API supported. Hurray!   
+        var timings = window.performance.getEntriesByName(name);
+
+        if (timings && timings[0]) {
+            var data = {
+                name: timings[0].name,
+                initiatorType: timings[0].initiatorType,
+                entryType: timings[0].entryType,
+                fetchStart: timings[0].fetchStart,
+                responseStart: timings[0].responseStart,
+                responseEnd: timings[0].responseEnd,
+                duration: timings[0].duration,
+                startTime: timings[0].startTime,
+                uuid: window.webcdn_uuid
+            };
+            Statistics.sendMessage('resource_timing', data);
+        }
+    }
+};
+
+Statistics.mark = function(name) {
+    window.performance.mark(name);
+};
+
+Statistics.measure = function() {
+    window.performance.getEntriesByType('mark').forEach(function(mark) {
+        var arr = mark.name.split(":");
+        var type = arr[0];
+        var id = arr[1];
+        if (type === "pc_connect_start") {
+            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
+        }
+        if (type === "lookup_start") {
+            window.performance.measure("lookup_duration:" + id, "lookup_start:" + id, "lookup_end:" + id);
+        }
+    });
+    var measures = window.performance.getEntriesByType('measure');
+
+    measures.forEach(function(measure) {
+        var arr = measure.name.split(":");
+        var type = arr[0];
+        var hash = arr[1];
+        var data = {
+            uuid: window.webcdn_uuid,
+            hash: hash,
+            duration: measure.duration
+        };
+        Statistics.sendMessage(type, data);
+    });
+};
+
+function createWebsocket()  {
+    var ws = new WebSocket(url);
+
+    ws.onclose = function(event) {
+        console.log("WebSocket.onclose", event);
+    };
+
+    ws.onerror = function(event) {
+        console.log("WebSocket.onerror", event);
+    };
+
+    ws.onmessage = function(event) {
+        var msg = JSON.parse(event.data);
+    };
+
+    ws.onopen = function(event) {
+        Statistics.addHost();
+        Statistics.queryResourceTiming();
+    };
+
+    return ws;
+};
+
+module.exports = Statistics;
 
 },{}],20:[function(require,module,exports){
 // Generate UUID
@@ -3499,8 +3546,10 @@ var UUID = (function() {
 module.exports = UUID;
 },{}],21:[function(require,module,exports){
 'use strict';
+
+window.webcdn_uuid = require('./lib/uuid.js')();
+
 var sha1 = require('sha1');
-var UUID = require('./lib/uuid.js');
 var Messenger = require('./lib/messenger.js');
 var Peernet = require('./lib/peernet.js');
 var Logger = require('./lib/logger.js');
@@ -3514,7 +3563,7 @@ var inherits = require('util').inherits;
     window.logger = new Logger();
 
     inherits(WebCDN, EventEmitter);
-    
+
     function WebCDN(config) {
         config = config ||  {};
         var self = this;
@@ -3528,7 +3577,9 @@ var inherits = require('util').inherits;
         });
 
         this._messenger.on('lookup-response', function(data) {
+            Statistics.mark("lookup_end:" + data.hash);
             if (data.peerid) {
+                Statistics.mark("pc_connect_start:" + data.peerid);
                 var peer = self._peernet.createConnection(data.peerid, data.hash);
                 peer.doOffer();
             } else {
@@ -3541,15 +3592,10 @@ var inherits = require('util').inherits;
     WebCDN.prototype.init = function(coordinatorUrl, callback) {
         var self = this;
         var id = getQueryId(coordinatorUrl)
-
-        this.uuid = id ||  UUID();
+        this.uuid = id ||  window.webcdn_uuid;
         if (!id) {
             coordinatorUrl += "?id=" + self.uuid;
         }
-
-        this.statistics = new Statistics({
-            uuid: this.uuid
-        });
 
         if (this._trackGeolocation) {
             this.emit('geolocation:start');
@@ -3610,21 +3656,25 @@ var inherits = require('util').inherits;
     };
 
     WebCDN.prototype._lookup = function(hash) {
+        Statistics.mark("lookup_start:" + hash);
         this._messenger.send('lookup', hash);
     };
 
     WebCDN.prototype._loadImageByCDN = function(hash) {
         var self = this;
         var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
-        element.onload = function() {
-            self._update([hash]);
-        };
+
         if (this._bucketUrl) {
             if (element.dataset.webcdnFallback.charAt(0) === '/') {
                 element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
             }
             element.dataset.webcdnFallback = this._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
         }
+
+        element.onload = function() {
+            Statistics.queryResourceTiming(this.dataset.webcdnFallback);
+            self._update([hash]);
+        };
         getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
             element.src = base64;
         }, function() {

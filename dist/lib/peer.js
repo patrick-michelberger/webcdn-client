@@ -1,5 +1,6 @@
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+var Statistics = require('./statistics.js');
 
 module.exports = Peer;
 inherits(Peer, EventEmitter);
@@ -87,6 +88,8 @@ Peer.prototype._createDataChannel = function(pc, label) {
     };
     dc.onopen = function() {
         logger.trace("WebRTC DataChannel", "OPEN");
+        Statistics.mark("pc_connect_end:" + self._id);
+        Statistics.measure();
         self._fetchObjects();
     };
     return dc;
@@ -116,6 +119,7 @@ Peer.prototype._gotReceiveChannel = function(event) {
     };
     this._receiveChannel.onopen = function() {};
     this._receiveChannel.onclose = function() {};
+
 };
 
 Peer.prototype._handleMessage = function(event) {
