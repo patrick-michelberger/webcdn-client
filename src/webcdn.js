@@ -21,7 +21,6 @@ var Peernet = require('./lib/peernet.js');
 var Statistics = require('./lib/statistics.js');
 var getCurrentPosition = require('./lib/geo.js');
 
-
 window.WebCDN = WebCDN;
 inherits(WebCDN, EventEmitter);
 
@@ -190,11 +189,9 @@ WebCDN.prototype._loadImageByCDN = function(hash) {
         Statistics.queryResourceTiming(this.dataset.webcdnFallback);
         self._update([hash]);
     };
-    getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
-        element.src = base64;
-    }, function() {
-        element.src = element.dataset.webcdnFallback;
-    });
+
+    element.setAttribute('crossOrigin', 'anonymous');
+    element.src = element.dataset.webcdnFallback;
 };
 
 /**
