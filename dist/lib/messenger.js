@@ -24,7 +24,7 @@ Messenger.prototype.send = function(type, data, receiver) {
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
     if (self.socket) {
-        logger.trace("Socket exist, init fail.");
+        console.log("Socket exist, init fail.");
         callback();
         return;
     }
@@ -33,11 +33,11 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
     self.socket = new WebSocket(coordinatorUrl);
 
     self.socket.onclose = function(event) {
-        logger.trace("WebSocket.onclose", event);
+        console.log("WebSocket.onclose", event);
     };
 
     self.socket.onerror = function(event) {
-        logger.trace("WebSocket.onerror", event);
+        console.log("WebSocket.onerror", event);
     };
 
     self.socket.onmessage = function(event) {

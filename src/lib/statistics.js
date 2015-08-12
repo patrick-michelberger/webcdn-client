@@ -58,7 +58,9 @@ Statistics.queryResourceTiming = function(name) {
 };
 
 Statistics.mark = function(name) {
-    window.performance.mark(name);
+    if (window.performance && window.performance.mark) {
+        window.performance.mark(name);
+    }
 };
 
 Statistics.measure = function() {

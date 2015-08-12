@@ -5,6 +5,8 @@ var Statistics = require('./statistics.js');
 module.exports = Peer;
 inherits(Peer, EventEmitter);
 
+var i = 0;
+
 function Peer(options) {
     EventEmitter.call(this);
     this._id = options.id;
@@ -41,9 +43,9 @@ Peer.prototype.init = function() {
     self._pc.oniceconnectionstatechange = function(evt) {
         var connectionState = evt.target.iceConnectionState;
         if (connectionState === 'connected' || connectionState === 'completed') {
-            // logger.trace("peerconnection status: connected");
+            // console.log("peerconnection status: connected");
         } else {
-            // logger.trace("peerconnection status: closed");
+            // console.log("peerconnection status: closed");
         }
     };
     self._sendChannel = self._createDataChannel(self.pc, label);
@@ -57,7 +59,7 @@ Peer.prototype._createPeerConnection = function() {
             urls: [this._stunUrl]
         }]
     };
-    var constraints = {}
+    var constraints = {};
     var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
     var name = "peerConnection_" + this._id;
     pc.onconnecting = this._createEventHandler(name + " onconnecting");
@@ -73,11 +75,13 @@ Peer.prototype._createPeerConnection = function() {
 Peer.prototype._createDataChannel = function(pc, label) {
     console.log("create data channel with label: ", label);
     var self = this;
-    var constraints = {};
+    var constraints = {
+        ordered: false
+    };
     var dc = self._pc.createDataChannel(label, constraints);
     var name = "dataChannel";
     dc.onclose = function() {
-        logger.trace("dataChannel close");
+        console.log("dataChannel close");
         self._createEventHandler(name + " onclose");
     };
     dc.onerror = function(err) {
@@ -87,9 +91,8 @@ Peer.prototype._createDataChannel = function(pc, label) {
         self._handleMessage.call(self, event);
     };
     dc.onopen = function() {
-        logger.trace("WebRTC DataChannel", "OPEN");
+        console.log("WebRTC DataChannel", "OPEN");
         Statistics.mark("pc_connect_end:" + self._id);
-        Statistics.measure();
         self._fetchObjects();
     };
     return dc;
@@ -98,6 +101,7 @@ Peer.prototype._createDataChannel = function(pc, label) {
 Peer.prototype._fetchObjects = function() {
     var self = this;
     self._hashes.forEach(function(hash) {
+        Statistics.mark("fetch_start:" + hash);
         self._fetch(hash);
     });
 };
@@ -108,6 +112,7 @@ Peer.prototype._fetch = function(hash) {
         hash: hash
     };
     var msg_string = JSON.stringify(msg);
+    console.log("fetch: " + hash + " : performance.now(): " + window.performance.now());
     this._sendChannel.send(msg_string);
 };
 
@@ -126,10 +131,16 @@ Peer.prototype._handleMessage = function(event) {
     var msg = JSON.parse(event.data);
     var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
     if (msg.type === 'fetch' && msg.hash) {
-        logger.trace("Send image", msg.hash);
+        console.log("Send image", msg.hash);
+        console.log("fetch received: " + msg.hash + " : performance.now(): " + window.performance.now());
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
-        logger.trace("Image received", msg.hash);
+        Statistics.mark("fetch_end:" + msg.hash);
+        if (i == 2) {
+            Statistics.measure();
+        }
+        i++;
+        console.log("Image received", msg.hash);
         endimage.src = this._imageData[msg.hash];
         endimage.classList.add('webcdn-loaded');
         var base64 = this._imageData[msg.hash].replace('data:application/octet-stream;base64,', '');
@@ -166,7 +177,7 @@ Peer.prototype.doOffer = function() {
             self._setLocalAndSendMessage.call(self, sessionDescription);
         }, function(err) {
             self._isConnected = false;
-            logger.trace("createOffer error", err);
+            console.log("createOffer error", err);
         }, constraints);
     }
 };
@@ -183,18 +194,17 @@ Peer.prototype.doAnswer = function() {
             }
         }
     }, function(err) {
-        logger.trace("createAnswer error", err);
+        console.log("createAnswer error", err);
     }, constraints);
 };
 
 Peer.prototype.setIceCandidates = function(iceCandidate) {
-    console.log("setIceCandidates...: ", iceCandidate);
-    if (!this._otherSDP) {
-        this._otherCandidates.push(iceCandidate);
-    }
-    if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
+    //if (!this._otherSDP) {
+    //    this._otherCandidates.push(iceCandidate);
+    //}
+    //if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
         this._pc.addIceCandidate(iceCandidate);
-    }
+    //}
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
@@ -204,7 +214,7 @@ Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
 
 Peer.prototype._iceCallback = function(event) {
     if (event.candidate) {
-        // logger.trace('Local ICE candidate: \n' + event.candidate.candidate);
+        // console.log('Local ICE candidate: \n' + event.candidate.candidate);
         var data = {
             type: 'candidate',
             label: event.candidate.sdpMLineIndex,
@@ -217,12 +227,12 @@ Peer.prototype._iceCallback = function(event) {
 
 Peer.prototype._handleReceiveChannelStateChange = function() {
     var readyState = this._receiveChannel.readyState;
-    logger.trace('Receive channel state is: ' + readyState);
+    console.log('Receive channel state is: ' + readyState);
 };
 
 Peer.prototype._createEventHandler = function(name) {
     return function(evt) {
-        logger.trace('' + name + ' Event ' + events.length, evt);
+        console.log('' + name + ' Event ' + events.length, evt);
     };
 };
 
@@ -235,7 +245,6 @@ Peer.prototype._sendImage = function(hash) {
     var data = imageToShare.src;
     var dataSent = 0;
     var intervalID = 0;
-
     intervalID = setInterval(function() {
         var slideEndIndex = dataSent + charSlice;
         if (slideEndIndex > data.length) {
@@ -249,7 +258,7 @@ Peer.prototype._sendImage = function(hash) {
         self._sendChannel.send(JSON.stringify(msg));
         dataSent = slideEndIndex;
         if (dataSent + 1 >= data.length) {
-            logger.trace("All data chunks for " + hash + " have been sent to ", self._id);
+            console.log("All data chunks for " + hash + " have been sent to ", self._id);
             var msg = {
                 type: "fetch-response",
                 hash: hash,
@@ -259,5 +268,4 @@ Peer.prototype._sendImage = function(hash) {
             clearInterval(intervalID);
         }
     }, delay);
-
 };

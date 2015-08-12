@@ -58,7 +58,9 @@ Statistics.queryResourceTiming = function(name) {
 };
 
 Statistics.mark = function(name) {
-    window.performance.mark(name);
+    if (window.performance && window.performance.mark) {
+        window.performance.mark(name);
+    }
 };
 
 Statistics.measure = function() {
@@ -71,6 +73,9 @@ Statistics.measure = function() {
         }
         if (type === "lookup_start") {
             window.performance.measure("lookup_duration:" + id, "lookup_start:" + id, "lookup_end:" + id);
+        }
+        if (type === "fetch_start") {
+            window.performance.measure("fetch_duration:" + id, "fetch_start:" + id, "fetch_end:" + id);
         }
     });
     var measures = window.performance.getEntriesByType('measure');
