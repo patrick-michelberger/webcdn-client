@@ -140,9 +140,9 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-browserify');
 
     // Define Tasks
-    grunt.registerTask('default', ['scripts', 'connect', 'watch', 'jsdoc']);
+    grunt.registerTask('default', ['scripts', 'connect', 'watch']);
     grunt.registerTask('doc', ['jsdoc']);
     grunt.registerTask('test', ['mocha']);
     grunt.registerTask('scripts', ['browserify', 'uglify']);
-    grunt.registerTask('build', ['clean:build', 'copy', 'scripts', 'mocha', 'jsdoc']);
+    grunt.registerTask('build', ['clean:build', 'copy', 'scripts', 'mocha']);
 };
