@@ -20,7 +20,7 @@ describe('WebCDN', function() {
                 expect(true).to.be.true;
                 done();
             });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid);
+            self.webcdn._connect('ws://localhost:8080?id=' + uuid);
         });
     });
 
@@ -74,7 +74,7 @@ describe('WebCDN', function() {
             });
 
             // peer 1
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+            self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
                 self.webcdn.load(hash);
                 setTimeout(function() {
                     var image = document.querySelector('[data-webcdn-hash="' + hash + '"]');
@@ -98,7 +98,7 @@ describe('WebCDN', function() {
                     done();
                 }
             });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+            self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
                 self.webcdn._initHashing();
                 self.webcdn._initLookup();
             });
@@ -114,7 +114,7 @@ describe('WebCDN', function() {
                 expect(msg.data).to.equal('123456');
                 done();
             });
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+            self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
                 self.webcdn._lookup('123456');
             });
         });
@@ -130,7 +130,7 @@ describe('WebCDN', function() {
                 done();
             });
 
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+            self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
                 self.webcdn._update('["123456","125355"]');
             });
 
@@ -140,7 +140,7 @@ describe('WebCDN', function() {
     describe('._loadImageByCDN', function() {
         it('should load the image and convert to base64 string', function(done) {
             var hash = "d3acd3cec21e3358f9de0ece79565b03c7800dcb";
-            self.webcdn.connect('ws://localhost:8080?id=' + uuid, function() {
+            self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
                 self.webcdn._loadImageByCDN(hash);
                 var image = document.querySelector('[data-webcdn-hash="' + hash + '"]');
                 setTimeout(function() {
