@@ -3571,7 +3571,6 @@ var Peernet = require('./lib/peernet.js');
 var Statistics = require('./lib/statistics.js');
 var getCurrentPosition = require('./lib/geo.js');
 
-
 window.WebCDN = WebCDN;
 inherits(WebCDN, EventEmitter);
 
@@ -3740,11 +3739,9 @@ WebCDN.prototype._loadImageByCDN = function(hash) {
         Statistics.queryResourceTiming(this.dataset.webcdnFallback);
         self._update([hash]);
     };
-    getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
-        element.src = base64;
-    }, function() {
-        element.src = element.dataset.webcdnFallback;
-    });
+
+    element.setAttribute('crossOrigin', 'anonymous');
+    element.src = element.dataset.webcdnFallback;
 };
 
 /**
@@ -3774,39 +3771,6 @@ function getImageData(domElement) {
     context.drawImage(domElement, 0, 0, domElement.width, domElement.height);
     var data = canvas.toDataURL("image/jpeg");
     return data;
-};
-
-/**
- * Downloads a resource from a given URL and converts it into a Base64-encoded string
- * @function getBase64FromImage
- * @param {String} url
- * @param {callback} onSuccess success callback
- * @param {callback} onError error callback
- * @returns {String}
- */
-function getBase64FromImage(url, onSuccess, onError) {
-    var xhr = new XMLHttpRequest();
-    xhr.responseType = "arraybuffer";
-    xhr.open("GET", url);
-    xhr.onload = function() {
-        var base64, binary, bytes, mediaType;
-        bytes = new Uint8Array(xhr.response);
-        //NOTE String.fromCharCode.apply(String, ...
-        //may cause "Maximum call stack size exceeded"
-        binary = [].map.call(bytes, function(byte) {
-            return String.fromCharCode(byte);
-        }).join('');
-        mediaType = xhr.getResponseHeader('content-type');
-        base64 = [
-            'data:',
-            mediaType ? mediaType + ';' : '',
-            'base64,',
-            btoa(binary)
-        ].join('');
-        onSuccess(base64);
-    };
-    xhr.onerror = onError;
-    xhr.send();
 };
 
 /**
