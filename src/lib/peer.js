@@ -37,17 +37,6 @@ Peer.prototype.init = function() {
     var self = this;
     var label = self._id;
     self._pc = self._createPeerConnection();
-    self._pc.onicecandidate = function(event) {
-        self._iceCallback.call(self, event);
-    };
-    self._pc.oniceconnectionstatechange = function(evt) {
-        var connectionState = evt.target.iceConnectionState;
-        if (connectionState === 'connected' || connectionState === 'completed') {
-            // console.log("peerconnection status: connected");
-        } else {
-            // console.log("peerconnection status: closed");
-        }
-    };
     self._sendChannel = self._createDataChannel(self.pc, label);
 };
 
@@ -62,10 +51,24 @@ Peer.prototype._createPeerConnection = function() {
     var constraints = {};
     var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
     var name = "peerConnection_" + this._id;
+    // General event handlers 
     pc.onconnecting = this._createEventHandler(name + " onconnecting");
     pc.onopen = this._createEventHandler(name + " onopen");
     pc.onaddstream = this._createEventHandler(name + " onaddstream");
     pc.onremovestream = this._createEventHandler(name + " onremovestream");
+    // ICE handlers
+    pc.onicecandidate = function(event) {
+        self._iceCallback.call(self, event);
+    };
+    pc.oniceconnectionstatechange = function(evt) {
+        var connectionState = evt.target.iceConnectionState;
+        if (connectionState === 'connected' || connectionState === 'completed') {
+            console.log("peerconnection status: connected");
+        } else {
+            console.log("peerconnection status: closed");
+        }
+    };
+    // Date channel handlers
     pc.ondatachannel = function(event) {
         self._gotReceiveChannel.call(self, event);
     };
@@ -73,13 +76,13 @@ Peer.prototype._createPeerConnection = function() {
 };
 
 Peer.prototype._createDataChannel = function(pc, label) {
-    console.log("create data channel with label: ", label);
     var self = this;
     var constraints = {
-        ordered: false
+        ordered: true
     };
     var dc = self._pc.createDataChannel(label, constraints);
     var name = "dataChannel";
+    // Event handlers 
     dc.onclose = function() {
         console.log("dataChannel close");
         self._createEventHandler(name + " onclose");
@@ -101,7 +104,6 @@ Peer.prototype._createDataChannel = function(pc, label) {
 Peer.prototype._fetchObjects = function() {
     var self = this;
     self._hashes.forEach(function(hash) {
-        Statistics.mark("fetch_start:" + hash);
         self._fetch(hash);
     });
 };
@@ -112,7 +114,7 @@ Peer.prototype._fetch = function(hash) {
         hash: hash
     };
     var msg_string = JSON.stringify(msg);
-    console.log("fetch: " + hash + " : performance.now(): " + window.performance.now());
+    Statistics.mark("fetch_start:" + hash);
     this._sendChannel.send(msg_string);
 };
 
@@ -132,7 +134,6 @@ Peer.prototype._handleMessage = function(event) {
     var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
     if (msg.type === 'fetch' && msg.hash) {
         console.log("Send image", msg.hash);
-        console.log("fetch received: " + msg.hash + " : performance.now(): " + window.performance.now());
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
         Statistics.mark("fetch_end:" + msg.hash);
@@ -142,6 +143,7 @@ Peer.prototype._handleMessage = function(event) {
         i++;
         console.log("Image received", msg.hash);
         endimage.src = this._imageData[msg.hash];
+        endimage.dataset.webcdnData = this._imageData[msg.hash];
         endimage.classList.add('webcdn-loaded');
         var base64 = this._imageData[msg.hash].replace('data:application/octet-stream;base64,', '');
         var base64_byte = base64.length * 6 / 8;
@@ -170,7 +172,6 @@ Peer.prototype.doOffer = function() {
     var self = this;
     var constraints = {};
     if (!self._isConnected) {
-        console.log("DO OFFER");
         self._isConnected = true;
         self._pc.createOffer(function(sessionDescription) {
             self._isConnected = true;
@@ -203,7 +204,7 @@ Peer.prototype.setIceCandidates = function(iceCandidate) {
     //    this._otherCandidates.push(iceCandidate);
     //}
     //if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
-        this._pc.addIceCandidate(iceCandidate);
+    this._pc.addIceCandidate(iceCandidate);
     //}
 };
 
@@ -237,35 +238,44 @@ Peer.prototype._createEventHandler = function(name) {
 };
 
 Peer.prototype._sendImage = function(hash) {
+    Statistics.mark("sendImage_start:" + hash);
     var self = this;
     var imageToShare = document.querySelector('[data-webcdn-hash="' + hash + '"]');
-    var delay = 10;
-    var charSlice = 10000;
-    var terminator = "\n";
-    var data = imageToShare.src;
+    var chunkSize = 16384; // 16 KB 
     var dataSent = 0;
-    var intervalID = 0;
-    intervalID = setInterval(function() {
-        var slideEndIndex = dataSent + charSlice;
-        if (slideEndIndex > data.length) {
-            slideEndIndex = data.length;
-        }
-        var msg = {
-            type: "fetch-response",
-            hash: hash,
-            data: data.slice(dataSent, slideEndIndex)
-        };
-        self._sendChannel.send(JSON.stringify(msg));
-        dataSent = slideEndIndex;
-        if (dataSent + 1 >= data.length) {
-            console.log("All data chunks for " + hash + " have been sent to ", self._id);
+    var data = imageToShare.dataset.webcdnData;
+
+    var sendAllData = function() {
+        while (dataSent < data.length) {
+            var slideEndIndex = dataSent + chunkSize;
+            if (slideEndIndex > data.length) {
+                slideEndIndex = data.length;
+            }
+
+            console.log("current bufferedAmount: ", self._sendChannel.bufferedAmount);  
+            if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
+                console.log("bufferedAmount ist too high! Slow down...");
+                setTimeout(sendAllData, 250);
+                return;
+            }
             var msg = {
                 type: "fetch-response",
                 hash: hash,
-                data: "\n"
+                data: data.slice(dataSent, slideEndIndex)
             };
             self._sendChannel.send(JSON.stringify(msg));
-            clearInterval(intervalID);
+            dataSent = slideEndIndex;
+            if (dataSent + 1 >= data.length) {
+                console.log("All data chunks for " + hash + " have been sent to ", self._id);
+                var msg = {
+                    type: "fetch-response",
+                    hash: hash,
+                    data: "\n"
+                };
+                self._sendChannel.send(JSON.stringify(msg));
+            }
         }
-    }, delay);
+    };
+
+    setTimeout(sendAllData, 0);
 };
