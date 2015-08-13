@@ -2915,6 +2915,10 @@ module.exports = charenc;
 
 }).call(this,require("buffer").Buffer)
 },{"buffer":1,"charenc":11,"crypt":12}],14:[function(require,module,exports){
+/**
+ * Receive user's current geolocation 
+ * @param {getCurrentPositionCallback} callback - The callback that handles the response.
+ */
 module.exports = function getCurrentPosition(callback) {
     var localGeolocation = getGeolocation();
     if (!localGeolocation) {
@@ -2967,6 +2971,14 @@ module.exports = function getCurrentPosition(callback) {
 
 };
 
+/**
+ * getCurrentPosition callback
+ * @callback getCurrentPositionCallback
+ * @param {Object} error - 
+ * @param position
+ * @param {String} position.latitude - latitude value
+ * @param {String} position.longitude - longitude value
+ */
 },{}],15:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
@@ -2974,23 +2986,20 @@ var inherits = require('util').inherits;
 module.exports = Messenger;
 inherits(Messenger, EventEmitter);
 
+/**
+ * Wrapper for setting up and maintaining a websocket connection
+ * @constructor 
+ */
 function Messenger() {
     EventEmitter.call(this);
     this.socket = null;
 };
 
-Messenger.prototype.send = function(type, data, receiver) {
-    var msg = {
-        type: type,
-        data: data
-    };
-    if (receiver) {
-        msg.to = receiver;
-    }
-    var s_msg = JSON.stringify(msg);
-    this.socket.send(s_msg);
-};
-
+/** 
+ * Connect to a given websocket server
+ * @param {String} coordinatorUrl - URL for websocket server
+ * @param {Callback} callback
+ */
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
     if (self.socket) {
@@ -2999,7 +3008,6 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
         return;
     }
 
-    //socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
     self.socket = new WebSocket(coordinatorUrl);
 
     self.socket.onclose = function(event) {
@@ -3026,9 +3034,30 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
 
 };
 
+/** 
+ * Close current websocket connection
+ */
 Messenger.prototype.disconnect = function() {
     this.socket.close();
     this.socket = null;
+};
+
+/**
+ * Send a message to a given peer via websocket connection
+ * @param {String} type - message type 
+ * @param {Object} data - message payload
+ * @param {String} receiver - peerid for receiver 
+ */
+Messenger.prototype.send = function(type, data, receiver) {
+    var msg = {
+        type: type,
+        data: data
+    };
+    if (receiver) {
+        msg.to = receiver;
+    }
+    var s_msg = JSON.stringify(msg);
+    this.socket.send(s_msg);
 };
 
 Messenger.prototype._handleRelayMessage = function(data) {
@@ -3049,6 +3078,16 @@ inherits(Peer, EventEmitter);
 
 var i = 0;
 
+/**
+ * Wrapper for setting up and maintaining peer connection with another peer
+ * @param options 
+ * @param {String} options.id - unique peerId
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @param {Object} options.wrtc - WebRTC implementation object
+ * @param {String} options.stunUrl - URL for Session Traversal Utilities for NAT (STUN) server
+ * @param {String} options.hash - unique hash value for given resource
+ * @constructor 
+ */
 function Peer(options) {
     EventEmitter.call(this);
     this._id = options.id;
@@ -3069,17 +3108,24 @@ function Peer(options) {
     this.init();
 };
 
-Peer.prototype.addHash = function(hash) {
-    if (hash) {
-        this._hashes.push(hash);
-    }
-};
-
+/** 
+ * Creates a RTCPeerConnection and a DataChannel with given peer.
+ */
 Peer.prototype.init = function() {
     var self = this;
     var label = self._id;
     self._pc = self._createPeerConnection();
     self._sendChannel = self._createDataChannel(self.pc, label);
+};
+
+/**
+ * Add resource hash to peer hash array. Indicates peer is storing this given resource.
+ * @param {String} hash - unique resource hash value
+ */
+Peer.prototype.addHash = function(hash) {
+    if (hash) {
+        this._hashes.push(hash);
+    }
 };
 
 Peer.prototype._createPeerConnection = function() {
@@ -3294,17 +3340,18 @@ Peer.prototype._sendImage = function(hash) {
                 slideEndIndex = data.length;
             }
 
-            console.log("current bufferedAmount: ", self._sendChannel.bufferedAmount);  
             if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
                 console.log("bufferedAmount ist too high! Slow down...");
                 setTimeout(sendAllData, 250);
                 return;
             }
+
             var msg = {
                 type: "fetch-response",
                 hash: hash,
                 data: data.slice(dataSent, slideEndIndex)
             };
+
             self._sendChannel.send(JSON.stringify(msg));
             dataSent = slideEndIndex;
             if (dataSent + 1 >= data.length) {
@@ -3331,6 +3378,12 @@ var getBrowserRTC = require('get-browser-rtc');
 module.exports = Peernet;
 inherits(Peernet, EventEmitter);
 
+/**
+ * Factory for creating {@link Peer} instances 
+ * @param options 
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @constructor 
+ */
 function Peernet(options) {
     if (!options || !options.signalChannel) {
         throw new Error('Please specify a signalChannel {"signalChannel": signalChannel}');
@@ -3348,9 +3401,14 @@ function Peernet(options) {
     });
 };
 
+/** 
+ * Create a peer connection with given peer id for a given resource hash value. 
+ * @param {String} peerId - unique peer id  
+ * @param {String} hash - unique resource hash value
+ * @return {Peer}
+ */
 Peernet.prototype.createConnection = function(peerId, hash) {
     var self = this;
-    console.log("Peernet.createConnection(peerId, hash): ", peerId);
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,
@@ -3412,8 +3470,16 @@ Peernet.prototype._handleRelayMessage = function(data) {
 var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 
+/**
+ * Statistics module 
+ * @constructor 
+ */
 var Statistics = {};
 
+/**
+ * Register current peer to the mediator server
+ * @static
+ */
 Statistics.addHost = function() {
     var data = {
         "uuid": window.webcdn_uuid,
@@ -3426,6 +3492,10 @@ Statistics.addHost = function() {
     Statistics.sendMessage("host:add", data);
 };
 
+/**
+ * Remove current peer from the mediator server
+ * @static
+ */
 Statistics.removeHost = function() {
     var data = {
         "uuid": window.webcdn_uuid
@@ -3433,6 +3503,12 @@ Statistics.removeHost = function() {
     Statistics.sendMessage("host:remove", data);
 };
 
+/**
+ * Send message to the mediator server
+ * @param {String} type - message type 
+ * @param {Object} data - message payload 
+ * @static
+ */
 Statistics.sendMessage = function(type, data) {
     var message = {
         type: type,
@@ -3441,6 +3517,11 @@ Statistics.sendMessage = function(type, data) {
     ws.send(JSON.stringify(message));
 };
 
+/**
+ * Request timing information for website's resources.
+ * @param {String} name - resource name e.g. URL 
+ * @static
+ */
 Statistics.queryResourceTiming = function(name) {
     if (!('performance' in window) ||
         !('getEntriesByType' in window.performance) ||
@@ -3468,11 +3549,21 @@ Statistics.queryResourceTiming = function(name) {
     }
 };
 
+/** 
+ * Sets performance timing mark
+ * @param {String} name - mark's name 
+ * @static
+ */
 Statistics.mark = function(name) {
     if (window.performance && window.performance.mark) {
         window.performance.mark(name);
     }
 };
+
+/**
+ * Iterates over all timing marks, computes the respective measures and sends them to the mediator.
+ * @static
+ */
 
 Statistics.measure = function() {
     window.performance.getEntriesByType('mark').forEach(function(mark) {
@@ -3530,7 +3621,10 @@ function createWebsocket()  {
 module.exports = Statistics;
 
 },{}],19:[function(require,module,exports){
-// Generate UUID
+/** 
+ * Generates a unique user identification
+ * @return {String} uuid - unique user identification
+ */
 var UUID = (function() {
     function b(
         a // placeholder
@@ -3586,9 +3680,9 @@ inherits(WebCDN, EventEmitter);
 
 /**
  * Creates a new WebCDN instance
- * @param config configuration settings
- * @param config.bucketUrl {String} Ressources have to be CORS-enables, for testing purposes mirror them in a configurable AWS bucket 
- * @param config.trackGeolocation {Boolean} Use HTML5 Geolocation API to identify user's current position
+ * @param config - configuration settings
+ * @param {String} config.bucketUrl - Ressources have to be CORS-enables, for testing purposes mirror them in a configurable AWS bucket 
+ * @param {Boolean} config.trackGeolocation - Use HTML5 Geolocation API to identify user's current position
  * @constructor
  */
 function WebCDN(config) {
@@ -3619,7 +3713,7 @@ function WebCDN(config) {
 /**
  * Initializes a WebCDN instance
  * @param {String} coordinatorUrl
- * @param {callback} callback Fires the WebCDN client is ready and has connected to the coordinator
+ * @param {callback} callback - Fires the WebCDN client is ready and has connected to the coordinator
  * @public
  */
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
@@ -3633,6 +3727,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
     if (this._trackGeolocation) {
         this.emit('geolocation:start');
         getCurrentPosition(function(err, position) {
+            console.log("current position: ", position);
             self.emit('geolocation:end');
             if (!err && position) {
                 coordinatorUrl += '&lat=' + position.latitude + '&lon=' + position.longitude;

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Global</title>
+    <title>JSDoc: Class: Messenger</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Global</h1>
+    <h1 class="page-title">Class: Messenger</h1>
 
     
 
@@ -29,7 +29,7 @@
 <header>
     
         <h2>
-        
+        Messenger
         </h2>
         
     
@@ -40,7 +40,28 @@
     
         
 
-        
+    
+
+    <h4 class="name" id="Messenger"><span class="type-signature"></span>new Messenger<span class="signature">()</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    Wrapper for setting up and maintaining a websocket connection
+</div>
+
+
+
+
+
+
+
+
+
+
+
 
 
 <dl class="details">
@@ -70,6 +91,11 @@
     
 
     
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_messenger.js.html">lib/messenger.js</a>, <a href="lib_messenger.js.html#line11">line 11</a>
+    </li></ul></dd>
+    
 
     
 
@@ -79,7 +105,20 @@
 </dl>
 
 
-        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     </div>
 
@@ -94,72 +133,6 @@
     
 
     
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="UUID"><span class="type-signature"></span>UUID<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Generates a unique user identification
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="lib_uuid.js.html">lib/uuid.js</a>, <a href="lib_uuid.js.html#line5">line 5</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
 
     
         <h3 class="subsection-title">Methods</h3>
@@ -169,14 +142,14 @@
 
     
 
-    <h4 class="name" id="getImageData"><span class="type-signature"></span>getImageData<span class="signature">(domElement)</span><span class="type-signature"> &rarr; {String}</span></h4>
+    <h4 class="name" id="connect"><span class="type-signature"></span>connect<span class="signature">(coordinatorUrl, callback)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    Draws a given image on a canvas element and returns it DataURL
+    Connect to a given websocket server
 </div>
 
 
@@ -212,10 +185,15 @@
 
         <tr>
             
-                <td class="name"><code>domElement</code></td>
+                <td class="name"><code>coordinatorUrl</code></td>
             
 
             <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
             
             </td>
 
@@ -223,146 +201,20 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">URL for websocket server</td>
         </tr>
 
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webcdn.js.html">webcdn.js</a>, <a href="webcdn.js.html#line211">line 211</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">String</span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-        
-            
-
-    
-
-    <h4 class="name" id="getQueryId"><span class="type-signature"></span>getQueryId<span class="signature">(url)</span><span class="type-signature"> &rarr; {String}</span></h4>
-
-    
-
-
-
-<div class="description">
-    Returns query id from a given URL string
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
     
 
         <tr>
             
-                <td class="name"><code>url</code></td>
+                <td class="name"><code>callback</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">String</span>
+<span class="param-type">Callback</span>
 
 
             
@@ -413,7 +265,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webcdn.js.html">webcdn.js</a>, <a href="webcdn.js.html#line227">line 227</a>
+        <a href="lib_messenger.js.html">lib/messenger.js</a>, <a href="lib_messenger.js.html#line21">line 21</a>
     </li></ul></dd>
     
 
@@ -436,46 +288,104 @@
 
 
 
-<h5>Returns:</h5>
-
-        
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">String</span>
-
-
-    </dd>
-</dl>
-
-    
 
 
 
         
-    
-
-    
-        <h3 class="subsection-title">Type Definitions</h3>
-
-        
-                
+            
 
     
 
-    <h4 class="name" id="getCurrentPositionCallback"><span class="type-signature"></span>getCurrentPositionCallback<span class="signature">(error, position)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="disconnect"><span class="type-signature"></span>disconnect<span class="signature">()</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    getCurrentPosition callback
+    Close current websocket connection
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_messenger.js.html">lib/messenger.js</a>, <a href="lib_messenger.js.html#line58">line 58</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="send"><span class="type-signature"></span>send<span class="signature">(type, data, receiver)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    Send a message to a given peer via websocket connection
 </div>
 
 
@@ -511,7 +421,30 @@
 
         <tr>
             
-                <td class="name"><code>error</code></td>
+                <td class="name"><code>type</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">message type</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
             
 
             <td class="type">
@@ -527,51 +460,14 @@
 
             
 
-            <td class="description last">-</td>
+            <td class="description last">message payload</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>position</code></td>
-            
-
-            <td class="type">
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>latitude</code></td>
+                <td class="name"><code>receiver</code></td>
             
 
             <td class="type">
@@ -587,37 +483,7 @@
 
             
 
-            <td class="description last">latitude value</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>longitude</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">longitude value</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
+            <td class="description last">peerid for receiver</td>
         </tr>
 
     
@@ -658,7 +524,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="lib_geo.js.html">lib/geo.js</a>, <a href="lib_geo.js.html#line57">line 57</a>
+        <a href="lib_messenger.js.html">lib/messenger.js</a>, <a href="lib_messenger.js.html#line69">line 69</a>
     </li></ul></dd>
     
 
@@ -684,7 +550,9 @@
 
 
 
-            
+        
+    
+
     
 
     
