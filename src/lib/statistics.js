@@ -1,8 +1,16 @@
 var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 
+/**
+ * Statistics module 
+ * @constructor 
+ */
 var Statistics = {};
 
+/**
+ * Register current peer to the mediator server
+ * @static
+ */
 Statistics.addHost = function() {
     var data = {
         "uuid": window.webcdn_uuid,
@@ -15,6 +23,10 @@ Statistics.addHost = function() {
     Statistics.sendMessage("host:add", data);
 };
 
+/**
+ * Remove current peer from the mediator server
+ * @static
+ */
 Statistics.removeHost = function() {
     var data = {
         "uuid": window.webcdn_uuid
@@ -22,6 +34,12 @@ Statistics.removeHost = function() {
     Statistics.sendMessage("host:remove", data);
 };
 
+/**
+ * Send message to the mediator server
+ * @param {String} type - message type 
+ * @param {Object} data - message payload 
+ * @static
+ */
 Statistics.sendMessage = function(type, data) {
     var message = {
         type: type,
@@ -30,6 +48,11 @@ Statistics.sendMessage = function(type, data) {
     ws.send(JSON.stringify(message));
 };
 
+/**
+ * Request timing information for website's resources.
+ * @param {String} name - resource name e.g. URL 
+ * @static
+ */
 Statistics.queryResourceTiming = function(name) {
     if (!('performance' in window) ||
         !('getEntriesByType' in window.performance) ||
@@ -57,11 +80,21 @@ Statistics.queryResourceTiming = function(name) {
     }
 };
 
+/** 
+ * Sets performance timing mark
+ * @param {String} name - mark's name 
+ * @static
+ */
 Statistics.mark = function(name) {
     if (window.performance && window.performance.mark) {
         window.performance.mark(name);
     }
 };
+
+/**
+ * Iterates over all timing marks, computes the respective measures and sends them to the mediator.
+ * @static
+ */
 
 Statistics.measure = function() {
     window.performance.getEntriesByType('mark').forEach(function(mark) {

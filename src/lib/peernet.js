@@ -6,6 +6,12 @@ var getBrowserRTC = require('get-browser-rtc');
 module.exports = Peernet;
 inherits(Peernet, EventEmitter);
 
+/**
+ * Factory for creating {@link Peer} instances 
+ * @param options 
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @constructor 
+ */
 function Peernet(options) {
     if (!options || !options.signalChannel) {
         throw new Error('Please specify a signalChannel {"signalChannel": signalChannel}');
@@ -23,9 +29,14 @@ function Peernet(options) {
     });
 };
 
+/** 
+ * Create a peer connection with given peer id for a given resource hash value. 
+ * @param {String} peerId - unique peer id  
+ * @param {String} hash - unique resource hash value
+ * @return {Peer}
+ */
 Peernet.prototype.createConnection = function(peerId, hash) {
     var self = this;
-    console.log("Peernet.createConnection(peerId, hash): ", peerId);
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,

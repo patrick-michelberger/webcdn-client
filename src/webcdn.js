@@ -26,9 +26,9 @@ inherits(WebCDN, EventEmitter);
 
 /**
  * Creates a new WebCDN instance
- * @param config configuration settings
- * @param config.bucketUrl {String} Ressources have to be CORS-enables, for testing purposes mirror them in a configurable AWS bucket 
- * @param config.trackGeolocation {Boolean} Use HTML5 Geolocation API to identify user's current position
+ * @param config - configuration settings
+ * @param {String} config.bucketUrl - Ressources have to be CORS-enables, for testing purposes mirror them in a configurable AWS bucket 
+ * @param {Boolean} config.trackGeolocation - Use HTML5 Geolocation API to identify user's current position
  * @constructor
  */
 function WebCDN(config) {
@@ -59,7 +59,7 @@ function WebCDN(config) {
 /**
  * Initializes a WebCDN instance
  * @param {String} coordinatorUrl
- * @param {callback} callback Fires the WebCDN client is ready and has connected to the coordinator
+ * @param {callback} callback - Fires the WebCDN client is ready and has connected to the coordinator
  * @public
  */
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
@@ -73,6 +73,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
     if (this._trackGeolocation) {
         this.emit('geolocation:start');
         getCurrentPosition(function(err, position) {
+            console.log("current position: ", position);
             self.emit('geolocation:end');
             if (!err && position) {
                 coordinatorUrl += '&lat=' + position.latitude + '&lon=' + position.longitude;

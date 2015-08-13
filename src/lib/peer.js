@@ -7,6 +7,16 @@ inherits(Peer, EventEmitter);
 
 var i = 0;
 
+/**
+ * Wrapper for setting up and maintaining peer connection with another peer
+ * @param options 
+ * @param {String} options.id - unique peerId
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @param {Object} options.wrtc - WebRTC implementation object
+ * @param {String} options.stunUrl - URL for Session Traversal Utilities for NAT (STUN) server
+ * @param {String} options.hash - unique hash value for given resource
+ * @constructor 
+ */
 function Peer(options) {
     EventEmitter.call(this);
     this._id = options.id;
@@ -27,17 +37,24 @@ function Peer(options) {
     this.init();
 };
 
-Peer.prototype.addHash = function(hash) {
-    if (hash) {
-        this._hashes.push(hash);
-    }
-};
-
+/** 
+ * Creates a RTCPeerConnection and a DataChannel with given peer.
+ */
 Peer.prototype.init = function() {
     var self = this;
     var label = self._id;
     self._pc = self._createPeerConnection();
     self._sendChannel = self._createDataChannel(self.pc, label);
+};
+
+/**
+ * Add resource hash to peer hash array. Indicates peer is storing this given resource.
+ * @param {String} hash - unique resource hash value
+ */
+Peer.prototype.addHash = function(hash) {
+    if (hash) {
+        this._hashes.push(hash);
+    }
 };
 
 Peer.prototype._createPeerConnection = function() {
@@ -252,17 +269,18 @@ Peer.prototype._sendImage = function(hash) {
                 slideEndIndex = data.length;
             }
 
-            console.log("current bufferedAmount: ", self._sendChannel.bufferedAmount);  
             if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
                 console.log("bufferedAmount ist too high! Slow down...");
                 setTimeout(sendAllData, 250);
                 return;
             }
+
             var msg = {
                 type: "fetch-response",
                 hash: hash,
                 data: data.slice(dataSent, slideEndIndex)
             };
+
             self._sendChannel.send(JSON.stringify(msg));
             dataSent = slideEndIndex;
             if (dataSent + 1 >= data.length) {
