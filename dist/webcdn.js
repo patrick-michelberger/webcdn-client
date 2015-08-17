@@ -3467,7 +3467,7 @@ Peernet.prototype._handleRelayMessage = function(data) {
 };
 
 },{"./peer.js":16,"events":5,"get-browser-rtc":10,"util":9}],18:[function(require,module,exports){
-var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
+var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 
 /**
