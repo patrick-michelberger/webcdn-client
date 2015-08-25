@@ -88,19 +88,6 @@ module.exports = function(grunt) {
             }
         },
 
-        yuidoc: {
-            compile: {
-                name: '<%= pkg.name %>',
-                description: '<%= pkg.description %>',
-                version: '<%= pkg.version %>',
-                options: {
-                    exclude: 'lib',
-                    paths: './src',
-                    outdir: './doc'
-                }
-            }
-        },
-
         mocha: {
             test: {
                 src: ['tests/**/*.html']
@@ -127,6 +114,15 @@ module.exports = function(grunt) {
                 src: 'src/webcdn.js',
                 dest: 'dist/webcdn.js'
             }
+        },
+
+        jsdoc: {
+            dist: {
+                src: ['src/**/*.js', 'test/*.js'],
+                options: {
+                    destination: 'doc'
+                }
+            }
         }
 
     });
@@ -138,14 +134,14 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-clean');
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-watch');
-    grunt.loadNpmTasks('grunt-contrib-yuidoc');
+    grunt.loadNpmTasks('grunt-jsdoc');
     grunt.loadNpmTasks('grunt-blanket-mocha');
     grunt.loadNpmTasks('grunt-mocha');
     grunt.loadNpmTasks('grunt-browserify');
 
     // Define Tasks
     grunt.registerTask('default', ['scripts', 'connect', 'watch']);
-    grunt.registerTask('doc', ['yuidoc']);
+    grunt.registerTask('doc', ['jsdoc']);
     grunt.registerTask('test', ['mocha']);
     grunt.registerTask('scripts', ['browserify', 'uglify']);
     grunt.registerTask('build', ['clean:build', 'copy', 'scripts', 'mocha']);

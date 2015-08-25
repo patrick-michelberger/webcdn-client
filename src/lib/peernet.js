@@ -6,6 +6,12 @@ var getBrowserRTC = require('get-browser-rtc');
 module.exports = Peernet;
 inherits(Peernet, EventEmitter);
 
+/**
+ * Factory for creating {@link Peer} instances 
+ * @param options 
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @constructor 
+ */
 function Peernet(options) {
     if (!options || !options.signalChannel) {
         throw new Error('Please specify a signalChannel {"signalChannel": signalChannel}');
@@ -23,9 +29,14 @@ function Peernet(options) {
     });
 };
 
+/** 
+ * Create a peer connection with given peer id for a given resource hash value. 
+ * @param {String} peerId - unique peer id  
+ * @param {String} hash - unique resource hash value
+ * @return {Peer}
+ */
 Peernet.prototype.createConnection = function(peerId, hash) {
     var self = this;
-    console.log("Peernet.createConnection(peerId, hash): ", peerId);
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,
@@ -52,14 +63,14 @@ Peernet.prototype._handleRelayMessage = function(data) {
     var started = true;
     var self = this;
     if (msg && msg.data && msg.data.type === 'offer') {
-        //logger.trace("offer from: ", msg.from);
+        //console.log("offer from: ", msg.from);
         var peer = this.createConnection(data.from);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
         console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
-        //logger.trace("answer from: ", msg.from);
+        //console.log("answer from: ", msg.from);
         var peer = this.createConnection(data.from);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
@@ -71,7 +82,7 @@ Peernet.prototype._handleRelayMessage = function(data) {
             }
         }
     } else if (msg && msg.data && msg.data.type === 'candidate' && started) {
-        //logger.trace("candidate from: ", data.from);
+        //console.log("candidate from: ", data.from);
         var candidate = new self._wrtc.RTCIceCandidate({
             candidate: msg.data.candidate
         });
@@ -79,6 +90,6 @@ Peernet.prototype._handleRelayMessage = function(data) {
         peer.setIceCandidates(candidate);
     } else if (msg && msg.data && msg.data.type === 'bye') {
         // TODO onRemoteHangup();
-        logger.trace('Hangup');
+        console.log('Hangup');
     }
 };

@@ -4,40 +4,36 @@ var inherits = require('util').inherits;
 module.exports = Messenger;
 inherits(Messenger, EventEmitter);
 
+/**
+ * Wrapper for setting up and maintaining a websocket connection
+ * @constructor 
+ */
 function Messenger() {
     EventEmitter.call(this);
     this.socket = null;
 };
 
-Messenger.prototype.send = function(type, data, receiver) {
-    var msg = {
-        type: type,
-        data: data
-    };
-    if (receiver) {
-        msg.to = receiver;
-    }
-    var s_msg = JSON.stringify(msg);
-    this.socket.send(s_msg);
-};
-
+/** 
+ * Connect to a given websocket server
+ * @param {String} coordinatorUrl - URL for websocket server
+ * @param {Callback} callback
+ */
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
     if (self.socket) {
-        logger.trace("Socket exist, init fail.");
+        console.log("Socket exist, init fail.");
         callback();
         return;
     }
 
-    //socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
     self.socket = new WebSocket(coordinatorUrl);
 
     self.socket.onclose = function(event) {
-        logger.trace("WebSocket.onclose", event);
+        console.log("WebSocket.onclose", event);
     };
 
     self.socket.onerror = function(event) {
-        logger.trace("WebSocket.onerror", event);
+        console.log("WebSocket.onerror", event);
     };
 
     self.socket.onmessage = function(event) {
@@ -56,9 +52,30 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
 
 };
 
+/** 
+ * Close current websocket connection
+ */
 Messenger.prototype.disconnect = function() {
     this.socket.close();
     this.socket = null;
+};
+
+/**
+ * Send a message to a given peer via websocket connection
+ * @param {String} type - message type 
+ * @param {Object} data - message payload
+ * @param {String} receiver - peerid for receiver 
+ */
+Messenger.prototype.send = function(type, data, receiver) {
+    var msg = {
+        type: type,
+        data: data
+    };
+    if (receiver) {
+        msg.to = receiver;
+    }
+    var s_msg = JSON.stringify(msg);
+    this.socket.send(s_msg);
 };
 
 Messenger.prototype._handleRelayMessage = function(data) {

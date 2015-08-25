@@ -2915,6 +2915,10 @@ module.exports = charenc;
 
 }).call(this,require("buffer").Buffer)
 },{"buffer":1,"charenc":11,"crypt":12}],14:[function(require,module,exports){
+/**
+ * Receive user's current geolocation 
+ * @param {getCurrentPositionCallback} callback - The callback that handles the response.
+ */
 module.exports = function getCurrentPosition(callback) {
     var localGeolocation = getGeolocation();
     if (!localGeolocation) {
@@ -2967,57 +2971,51 @@ module.exports = function getCurrentPosition(callback) {
 
 };
 
+/**
+ * getCurrentPosition callback
+ * @callback getCurrentPositionCallback
+ * @param {Object} error - 
+ * @param position
+ * @param {String} position.latitude - latitude value
+ * @param {String} position.longitude - longitude value
+ */
 },{}],15:[function(require,module,exports){
-module.exports = Logger;
-
-function Logger() {};
-
-Logger.prototype.trace = function(text, data) {
-    //console.log((performance.now() / 1000).toFixed(3) + ": " + text);
-    console.log(text, data);
-};
-
-},{}],16:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 
 module.exports = Messenger;
 inherits(Messenger, EventEmitter);
 
+/**
+ * Wrapper for setting up and maintaining a websocket connection
+ * @constructor 
+ */
 function Messenger() {
     EventEmitter.call(this);
     this.socket = null;
 };
 
-Messenger.prototype.send = function(type, data, receiver) {
-    var msg = {
-        type: type,
-        data: data
-    };
-    if (receiver) {
-        msg.to = receiver;
-    }
-    var s_msg = JSON.stringify(msg);
-    this.socket.send(s_msg);
-};
-
+/** 
+ * Connect to a given websocket server
+ * @param {String} coordinatorUrl - URL for websocket server
+ * @param {Callback} callback
+ */
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
     if (self.socket) {
-        logger.trace("Socket exist, init fail.");
+        console.log("Socket exist, init fail.");
         callback();
         return;
     }
 
-    //socket = new WebSocket(coordinatorUrl + '?id=' + uuid);
     self.socket = new WebSocket(coordinatorUrl);
 
     self.socket.onclose = function(event) {
-        logger.trace("WebSocket.onclose", event);
+        console.log("WebSocket.onclose", event);
     };
 
     self.socket.onerror = function(event) {
-        logger.trace("WebSocket.onerror", event);
+        console.log("WebSocket.onerror", event);
     };
 
     self.socket.onmessage = function(event) {
@@ -3036,9 +3034,30 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
 
 };
 
+/** 
+ * Close current websocket connection
+ */
 Messenger.prototype.disconnect = function() {
     this.socket.close();
     this.socket = null;
+};
+
+/**
+ * Send a message to a given peer via websocket connection
+ * @param {String} type - message type 
+ * @param {Object} data - message payload
+ * @param {String} receiver - peerid for receiver 
+ */
+Messenger.prototype.send = function(type, data, receiver) {
+    var msg = {
+        type: type,
+        data: data
+    };
+    if (receiver) {
+        msg.to = receiver;
+    }
+    var s_msg = JSON.stringify(msg);
+    this.socket.send(s_msg);
 };
 
 Messenger.prototype._handleRelayMessage = function(data) {
@@ -3049,13 +3068,26 @@ Messenger.prototype._handleLookupResponse = function(peerId) {
     this.emit('lookup-response', peerId);
 };
 
-},{"events":5,"util":9}],17:[function(require,module,exports){
+},{"events":5,"util":9}],16:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+var Statistics = require('./statistics.js');
 
 module.exports = Peer;
 inherits(Peer, EventEmitter);
 
+var i = 0;
+
+/**
+ * Wrapper for setting up and maintaining peer connection with another peer
+ * @param options 
+ * @param {String} options.id - unique peerId
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @param {Object} options.wrtc - WebRTC implementation object
+ * @param {String} options.stunUrl - URL for Session Traversal Utilities for NAT (STUN) server
+ * @param {String} options.hash - unique hash value for given resource
+ * @constructor 
+ */
 function Peer(options) {
     EventEmitter.call(this);
     this._id = options.id;
@@ -3076,28 +3108,24 @@ function Peer(options) {
     this.init();
 };
 
-Peer.prototype.addHash = function(hash) {
-    if (hash) {
-        this._hashes.push(hash);
-    }
-};
-
+/** 
+ * Creates a RTCPeerConnection and a DataChannel with given peer.
+ */
 Peer.prototype.init = function() {
     var self = this;
     var label = self._id;
     self._pc = self._createPeerConnection();
-    self._pc.onicecandidate = function(event) {
-        self._iceCallback.call(self, event);
-    };
-    self._pc.oniceconnectionstatechange = function(evt) {
-        var connectionState = evt.target.iceConnectionState;
-        if (connectionState === 'connected' || connectionState === 'completed') {
-            // logger.trace("peerconnection status: connected");
-        } else {
-            // logger.trace("peerconnection status: closed");
-        }
-    };
     self._sendChannel = self._createDataChannel(self.pc, label);
+};
+
+/**
+ * Add resource hash to peer hash array. Indicates peer is storing this given resource.
+ * @param {String} hash - unique resource hash value
+ */
+Peer.prototype.addHash = function(hash) {
+    if (hash) {
+        this._hashes.push(hash);
+    }
 };
 
 Peer.prototype._createPeerConnection = function() {
@@ -3108,13 +3136,27 @@ Peer.prototype._createPeerConnection = function() {
             urls: [this._stunUrl]
         }]
     };
-    var constraints = {}
+    var constraints = {};
     var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
     var name = "peerConnection_" + this._id;
+    // General event handlers 
     pc.onconnecting = this._createEventHandler(name + " onconnecting");
     pc.onopen = this._createEventHandler(name + " onopen");
     pc.onaddstream = this._createEventHandler(name + " onaddstream");
     pc.onremovestream = this._createEventHandler(name + " onremovestream");
+    // ICE handlers
+    pc.onicecandidate = function(event) {
+        self._iceCallback.call(self, event);
+    };
+    pc.oniceconnectionstatechange = function(evt) {
+        var connectionState = evt.target.iceConnectionState;
+        if (connectionState === 'connected' || connectionState === 'completed') {
+            console.log("peerconnection status: connected");
+        } else {
+            console.log("peerconnection status: closed");
+        }
+    };
+    // Date channel handlers
     pc.ondatachannel = function(event) {
         self._gotReceiveChannel.call(self, event);
     };
@@ -3122,13 +3164,15 @@ Peer.prototype._createPeerConnection = function() {
 };
 
 Peer.prototype._createDataChannel = function(pc, label) {
-    console.log("create data channel with label: ", label);
     var self = this;
-    var constraints = {};
+    var constraints = {
+        ordered: true
+    };
     var dc = self._pc.createDataChannel(label, constraints);
     var name = "dataChannel";
+    // Event handlers 
     dc.onclose = function() {
-        logger.trace("dataChannel close");
+        console.log("dataChannel close");
         self._createEventHandler(name + " onclose");
     };
     dc.onerror = function(err) {
@@ -3138,7 +3182,8 @@ Peer.prototype._createDataChannel = function(pc, label) {
         self._handleMessage.call(self, event);
     };
     dc.onopen = function() {
-        logger.trace("WebRTC DataChannel", "OPEN");
+        console.log("WebRTC DataChannel", "OPEN");
+        Statistics.mark("pc_connect_end:" + self._id);
         self._fetchObjects();
     };
     return dc;
@@ -3157,6 +3202,7 @@ Peer.prototype._fetch = function(hash) {
         hash: hash
     };
     var msg_string = JSON.stringify(msg);
+    Statistics.mark("fetch_start:" + hash);
     this._sendChannel.send(msg_string);
 };
 
@@ -3168,17 +3214,24 @@ Peer.prototype._gotReceiveChannel = function(event) {
     };
     this._receiveChannel.onopen = function() {};
     this._receiveChannel.onclose = function() {};
+
 };
 
 Peer.prototype._handleMessage = function(event) {
     var msg = JSON.parse(event.data);
     var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
     if (msg.type === 'fetch' && msg.hash) {
-        logger.trace("Send image", msg.hash);
+        console.log("Send image", msg.hash);
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
-        logger.trace("Image received", msg.hash);
+        Statistics.mark("fetch_end:" + msg.hash);
+        if (i == 2) {
+            Statistics.measure();
+        }
+        i++;
+        console.log("Image received", msg.hash);
         endimage.src = this._imageData[msg.hash];
+        endimage.dataset.webcdnData = this._imageData[msg.hash];
         endimage.classList.add('webcdn-loaded');
         var base64 = this._imageData[msg.hash].replace('data:application/octet-stream;base64,', '');
         var base64_byte = base64.length * 6 / 8;
@@ -3207,14 +3260,13 @@ Peer.prototype.doOffer = function() {
     var self = this;
     var constraints = {};
     if (!self._isConnected) {
-        console.log("DO OFFER");
         self._isConnected = true;
         self._pc.createOffer(function(sessionDescription) {
             self._isConnected = true;
             self._setLocalAndSendMessage.call(self, sessionDescription);
         }, function(err) {
             self._isConnected = false;
-            logger.trace("createOffer error", err);
+            console.log("createOffer error", err);
         }, constraints);
     }
 };
@@ -3231,18 +3283,17 @@ Peer.prototype.doAnswer = function() {
             }
         }
     }, function(err) {
-        logger.trace("createAnswer error", err);
+        console.log("createAnswer error", err);
     }, constraints);
 };
 
 Peer.prototype.setIceCandidates = function(iceCandidate) {
-    console.log("setIceCandidates...: ", iceCandidate);
-    if (!this._otherSDP) {
-        this._otherCandidates.push(iceCandidate);
-    }
-    if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
-        this._pc.addIceCandidate(iceCandidate);
-    }
+    //if (!this._otherSDP) {
+    //    this._otherCandidates.push(iceCandidate);
+    //}
+    //if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
+    this._pc.addIceCandidate(iceCandidate);
+    //}
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
@@ -3252,7 +3303,7 @@ Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
 
 Peer.prototype._iceCallback = function(event) {
     if (event.candidate) {
-        // logger.trace('Local ICE candidate: \n' + event.candidate.candidate);
+        // console.log('Local ICE candidate: \n' + event.candidate.candidate);
         var data = {
             type: 'candidate',
             label: event.candidate.sdpMLineIndex,
@@ -3265,52 +3316,60 @@ Peer.prototype._iceCallback = function(event) {
 
 Peer.prototype._handleReceiveChannelStateChange = function() {
     var readyState = this._receiveChannel.readyState;
-    logger.trace('Receive channel state is: ' + readyState);
+    console.log('Receive channel state is: ' + readyState);
 };
 
 Peer.prototype._createEventHandler = function(name) {
     return function(evt) {
-        logger.trace('' + name + ' Event ' + events.length, evt);
+        console.log('' + name + ' Event ' + events.length, evt);
     };
 };
 
 Peer.prototype._sendImage = function(hash) {
+    Statistics.mark("sendImage_start:" + hash);
     var self = this;
     var imageToShare = document.querySelector('[data-webcdn-hash="' + hash + '"]');
-    var delay = 10;
-    var charSlice = 10000;
-    var terminator = "\n";
-    var data = imageToShare.src;
+    var chunkSize = 16384; // 16 KB 
     var dataSent = 0;
-    var intervalID = 0;
+    var data = imageToShare.dataset.webcdnData;
 
-    intervalID = setInterval(function() {
-        var slideEndIndex = dataSent + charSlice;
-        if (slideEndIndex > data.length) {
-            slideEndIndex = data.length;
-        }
-        var msg = {
-            type: "fetch-response",
-            hash: hash,
-            data: data.slice(dataSent, slideEndIndex)
-        };
-        self._sendChannel.send(JSON.stringify(msg));
-        dataSent = slideEndIndex;
-        if (dataSent + 1 >= data.length) {
-            logger.trace("All data chunks for " + hash + " have been sent to ", self._id);
+    var sendAllData = function() {
+        while (dataSent < data.length) {
+            var slideEndIndex = dataSent + chunkSize;
+            if (slideEndIndex > data.length) {
+                slideEndIndex = data.length;
+            }
+
+            if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
+                console.log("bufferedAmount ist too high! Slow down...");
+                setTimeout(sendAllData, 250);
+                return;
+            }
+
             var msg = {
                 type: "fetch-response",
                 hash: hash,
-                data: "\n"
+                data: data.slice(dataSent, slideEndIndex)
             };
-            self._sendChannel.send(JSON.stringify(msg));
-            clearInterval(intervalID);
-        }
-    }, delay);
 
+            self._sendChannel.send(JSON.stringify(msg));
+            dataSent = slideEndIndex;
+            if (dataSent + 1 >= data.length) {
+                console.log("All data chunks for " + hash + " have been sent to ", self._id);
+                var msg = {
+                    type: "fetch-response",
+                    hash: hash,
+                    data: "\n"
+                };
+                self._sendChannel.send(JSON.stringify(msg));
+            }
+        }
+    };
+
+    setTimeout(sendAllData, 0);
 };
 
-},{"events":5,"util":9}],18:[function(require,module,exports){
+},{"./statistics.js":18,"events":5,"util":9}],17:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
@@ -3319,6 +3378,12 @@ var getBrowserRTC = require('get-browser-rtc');
 module.exports = Peernet;
 inherits(Peernet, EventEmitter);
 
+/**
+ * Factory for creating {@link Peer} instances 
+ * @param options 
+ * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
+ * @constructor 
+ */
 function Peernet(options) {
     if (!options || !options.signalChannel) {
         throw new Error('Please specify a signalChannel {"signalChannel": signalChannel}');
@@ -3336,9 +3401,14 @@ function Peernet(options) {
     });
 };
 
+/** 
+ * Create a peer connection with given peer id for a given resource hash value. 
+ * @param {String} peerId - unique peer id  
+ * @param {String} hash - unique resource hash value
+ * @return {Peer}
+ */
 Peernet.prototype.createConnection = function(peerId, hash) {
     var self = this;
-    console.log("Peernet.createConnection(peerId, hash): ", peerId);
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,
@@ -3365,14 +3435,14 @@ Peernet.prototype._handleRelayMessage = function(data) {
     var started = true;
     var self = this;
     if (msg && msg.data && msg.data.type === 'offer') {
-        //logger.trace("offer from: ", msg.from);
+        //console.log("offer from: ", msg.from);
         var peer = this.createConnection(data.from);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
         console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
-        //logger.trace("answer from: ", msg.from);
+        //console.log("answer from: ", msg.from);
         var peer = this.createConnection(data.from);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
@@ -3384,7 +3454,7 @@ Peernet.prototype._handleRelayMessage = function(data) {
             }
         }
     } else if (msg && msg.data && msg.data.type === 'candidate' && started) {
-        //logger.trace("candidate from: ", data.from);
+        //console.log("candidate from: ", data.from);
         var candidate = new self._wrtc.RTCIceCandidate({
             candidate: msg.data.candidate
         });
@@ -3392,12 +3462,169 @@ Peernet.prototype._handleRelayMessage = function(data) {
         peer.setIceCandidates(candidate);
     } else if (msg && msg.data && msg.data.type === 'bye') {
         // TODO onRemoteHangup();
-        logger.trace('Hangup');
+        console.log('Hangup');
     }
 };
 
-},{"./peer.js":17,"events":5,"get-browser-rtc":10,"util":9}],19:[function(require,module,exports){
-// Generate UUID
+},{"./peer.js":16,"events":5,"get-browser-rtc":10,"util":9}],18:[function(require,module,exports){
+var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
+var ws = createWebsocket();
+
+/**
+ * Statistics module 
+ * @constructor 
+ */
+var Statistics = {};
+
+/**
+ * Register current peer to the mediator server
+ * @static
+ */
+Statistics.addHost = function() {
+    var data = {
+        "uuid": window.webcdn_uuid,
+        "active": true
+    };
+    if (window.performance && window.performance.timing) {
+        data.performance = {};
+        data.performance.timing = window.performance.timing.toJSON();
+    }
+    Statistics.sendMessage("host:add", data);
+};
+
+/**
+ * Remove current peer from the mediator server
+ * @static
+ */
+Statistics.removeHost = function() {
+    var data = {
+        "uuid": window.webcdn_uuid
+    };
+    Statistics.sendMessage("host:remove", data);
+};
+
+/**
+ * Send message to the mediator server
+ * @param {String} type - message type 
+ * @param {Object} data - message payload 
+ * @static
+ */
+Statistics.sendMessage = function(type, data) {
+    var message = {
+        type: type,
+        data: data
+    };
+    ws.send(JSON.stringify(message));
+};
+
+/**
+ * Request timing information for website's resources.
+ * @param {String} name - resource name e.g. URL 
+ * @static
+ */
+Statistics.queryResourceTiming = function(name) {
+    if (!('performance' in window) ||
+        !('getEntriesByType' in window.performance) ||
+        !(window.performance.getEntriesByType('resource') instanceof Array)
+    ) {
+        // API not supported
+    } else {
+        // API supported. Hurray!   
+        var timings = window.performance.getEntriesByName(name);
+
+        if (timings && timings[0]) {
+            var data = {
+                name: timings[0].name,
+                initiatorType: timings[0].initiatorType,
+                entryType: timings[0].entryType,
+                fetchStart: timings[0].fetchStart,
+                responseStart: timings[0].responseStart,
+                responseEnd: timings[0].responseEnd,
+                duration: timings[0].duration,
+                startTime: timings[0].startTime,
+                uuid: window.webcdn_uuid
+            };
+            Statistics.sendMessage('resource_timing', data);
+        }
+    }
+};
+
+/** 
+ * Sets performance timing mark
+ * @param {String} name - mark's name 
+ * @static
+ */
+Statistics.mark = function(name) {
+    if (window.performance && window.performance.mark) {
+        window.performance.mark(name);
+    }
+};
+
+/**
+ * Iterates over all timing marks, computes the respective measures and sends them to the mediator.
+ * @static
+ */
+
+Statistics.measure = function() {
+    window.performance.getEntriesByType('mark').forEach(function(mark) {
+        var arr = mark.name.split(":");
+        var type = arr[0];
+        var id = arr[1];
+        if (type === "pc_connect_start") {
+            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
+        }
+        if (type === "lookup_start") {
+            window.performance.measure("lookup_duration:" + id, "lookup_start:" + id, "lookup_end:" + id);
+        }
+        if (type === "fetch_start") {
+            window.performance.measure("fetch_duration:" + id, "fetch_start:" + id, "fetch_end:" + id);
+        }
+    });
+    var measures = window.performance.getEntriesByType('measure');
+
+    measures.forEach(function(measure) {
+        var arr = measure.name.split(":");
+        var type = arr[0];
+        var hash = arr[1];
+        var data = {
+            uuid: window.webcdn_uuid,
+            hash: hash,
+            duration: measure.duration
+        };
+        Statistics.sendMessage(type, data);
+    });
+};
+
+function createWebsocket()  {
+    var ws = new WebSocket(url);
+
+    ws.onclose = function(event) {
+        console.log("WebSocket.onclose", event);
+    };
+
+    ws.onerror = function(event) {
+        console.log("WebSocket.onerror", event);
+    };
+
+    ws.onmessage = function(event) {
+        var msg = JSON.parse(event.data);
+    };
+
+    ws.onopen = function(event) {
+        Statistics.addHost();
+        Statistics.queryResourceTiming();
+    };
+
+    return ws;
+};
+
+module.exports = Statistics;
+
+},{}],19:[function(require,module,exports){
+/** 
+ * Generates a unique user identification
+ * @return {String} uuid - unique user identification
+ */
 var UUID = (function() {
     function b(
         a // placeholder
@@ -3426,192 +3653,245 @@ var UUID = (function() {
 module.exports = UUID;
 },{}],20:[function(require,module,exports){
 'use strict';
+
+/**
+ * @fileOverview WebCDN - A Content Distribution Network from web browsers using WebRTC
+ * @author Patrick Michelberger
+ * @example
+ * var webcdn = new WebCDN();
+ * webcdn.init('ws://webcdn.michelberger.info:1337', function() { 
+ *   console.log("Your WebCDN is ready!");
+ * });
+ * @see <a href="http://webcdn.michelberger.info">WebCDN project website</a>.
+ */
+
+window.webcdn_uuid = require('./lib/uuid.js')();
+
 var sha1 = require('sha1');
-var UUID = require('./lib/uuid.js');
-var Messenger = require('./lib/messenger.js');
-var Peernet = require('./lib/peernet.js');
-var Logger = require('./lib/logger.js');
-var getCurrentPosition = require('./lib/geo.js');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+var Messenger = require('./lib/messenger.js');
+var Peernet = require('./lib/peernet.js');
+var Statistics = require('./lib/statistics.js');
+var getCurrentPosition = require('./lib/geo.js');
 
-(function(window) {
+window.WebCDN = WebCDN;
+inherits(WebCDN, EventEmitter);
 
-    window.logger = new Logger();
+/**
+ * Creates a new WebCDN instance
+ * @param config - configuration settings
+ * @param {String} config.bucketUrl - Ressources have to be CORS-enables, for testing purposes mirror them in a configurable AWS bucket 
+ * @param {Boolean} config.trackGeolocation - Use HTML5 Geolocation API to identify user's current position
+ * @constructor
+ */
+function WebCDN(config) {
+    config = config ||  {};
+    var self = this;
+    this._bucketUrl = config.bucketUrl ||  false;
+    this._trackGeolocation = config.trackGeolocation ||  false;
+    this._items = {};
+    this._hashes = [];
+    this._messenger = new Messenger();
+    this._peernet = new Peernet({
+        signalChannel: this._messenger
+    });
 
-    inherits(WebCDN, EventEmitter);
-    
-    function WebCDN(config) {
-        config = config ||  {};
-        var self = this;
-        this._bucketUrl = config.bucketUrl ||  false;
-        this._trackGeolocation = config.trackGeolocation ||  false;
-        this._items = {};
-        this._hashes = [];
-        this._messenger = new Messenger();
-        this._peernet = new Peernet({
-            signalChannel: this._messenger
-        });
-
-        this._messenger.on('lookup-response', function(data) {
-            if (data.peerid) {
-                var peer = self._peernet.createConnection(data.peerid, data.hash);
-                peer.doOffer();
-            } else {
-                // CDN Fallback
-                self._loadImageByCDN(data.hash);
-            }
-        });
-    };
-
-    WebCDN.prototype.init = function(coordinatorUrl, callback) {
-        var self = this;
-        var id = getQueryId(coordinatorUrl)
-
-        this.uuid = id ||  UUID();
-        if (!id) {
-            coordinatorUrl += "?id=" + self.uuid;
-        }
-
-        if (this._trackGeolocation) {
-            this.emit('geolocation:start');
-            getCurrentPosition(function(err, position) {
-                self.emit('geolocation:end');
-                if (!err && position) {
-                    coordinatorUrl += '&lat=' + position.latitude + '&lon=' + position.longitude;
-                }
-                connect(callback);
-            });
+    this._messenger.on('lookup-response', function(data) {
+        Statistics.mark("lookup_end:" + data.hash);
+        if (data.peerid) {
+            Statistics.mark("pc_connect_start:" + data.peerid);
+            var peer = self._peernet.createConnection(data.peerid, data.hash);
+            peer.doOffer();
         } else {
-            connect(callback);
+            // CDN Fallback
+            self._loadImageByCDN(data.hash);
         }
+    });
+};
 
-        function connect(callback) {
-            self.connect(coordinatorUrl, function() {
-                self._initHashing();
-                self._initLookup();
-                callback();
-            });
-        };
-    };
+/**
+ * Initializes a WebCDN instance
+ * @param {String} coordinatorUrl
+ * @param {callback} callback - Fires the WebCDN client is ready and has connected to the coordinator
+ * @public
+ */
+WebCDN.prototype.init = function(coordinatorUrl, callback) {
+    var self = this;
+    var id = getQueryId(coordinatorUrl)
+    this.uuid = id ||  window.webcdn_uuid;
+    if (!id) {
+        coordinatorUrl += "?id=" + self.uuid;
+    }
 
-    WebCDN.prototype.connect = function(coordinatorUrl, callback) {
-        this._messenger.connect(coordinatorUrl, function() {
+    if (this._trackGeolocation) {
+        this.emit('geolocation:start');
+        getCurrentPosition(function(err, position) {
+            console.log("current position: ", position);
+            self.emit('geolocation:end');
+            if (!err && position) {
+                coordinatorUrl += '&lat=' + position.latitude + '&lon=' + position.longitude;
+            }
+            connect(callback);
+        });
+    } else {
+        connect(callback);
+    }
+
+    function connect(callback) {
+        self._connect(coordinatorUrl, function() {
+            self._initHashing();
+            self._initLookup();
             callback();
         });
     };
+};
 
-    WebCDN.prototype.load = function(content_hash) {
-        this._lookup(content_hash);
-    };
+/**
+ * Load a resource with a given content hash
+ * @param {String} hash resouce hash computed by _getItemHash()
+ * @pubic
+ */
+WebCDN.prototype.load = function(hash) {
+    this._lookup(hash);
+};
 
-    WebCDN.prototype._initHashing = function() {
-        var self = this;
-        var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
-        items.forEach(function(item) {
-            var hash = self._getItemHash(item);
-            self._hashes.push(hash);
-            self._items[hash] = item.id;
-            item.dataset.webcdnHash = hash;
-        });
-    };
+/**
+ * Connect to a given WebCDN coordinator serve
+ * @param {String} url coordinator's URL
+ * @param {callback} callback
+ * @private
+ */
+WebCDN.prototype._connect = function(url, callback) {
+    this._messenger.connect(url, function() {
+        callback();
+    });
+};
 
-    WebCDN.prototype._getItemHash = function(item) {
-        var hash = sha1(item.dataset.webcdnFallback);
-        return hash;
-    };
+/**
+ * Computes an unique hash value for each resource marked with a data-webcdn-callback attribute 
+ * @private
+ */
+WebCDN.prototype._initHashing = function() {
+    var self = this;
+    var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
+    items.forEach(function(item) {
+        var hash = self._getItemHash(item);
+        self._hashes.push(hash);
+        self._items[hash] = item.id;
+        item.dataset.webcdnHash = hash;
+    });
+};
 
-    WebCDN.prototype._update = function(hashes) {
-        this._messenger.send('update', hashes);
-    };
+/**
+ * Computes an unique hash value for a given DOM object 
+ * @param {Object} item DOM object
+ * @private
+ */
+WebCDN.prototype._getItemHash = function(item) {
+    var hash = sha1(item.dataset.webcdnFallback);
+    return hash;
+};
 
-    WebCDN.prototype._initLookup = function() {
-        for (var hash in this._items) {
-            this.load(hash);
+
+/**
+ * Send a "update" message to inform the coordinator about stored items
+ * @param {Array} hashes Content hashes computed by _getItemHash()
+ * @private
+ */
+WebCDN.prototype._update = function(hashes) {
+    this._messenger.send('update', hashes);
+};
+
+/**
+ * Iterates about each marked WebCDN items and executes a "lookup" request to the coordinator
+ * @private
+ */
+WebCDN.prototype._initLookup = function() {
+    for (var hash in this._items) {
+        this.load(hash);
+    }
+};
+
+/**
+ * Send a "lookup" message for a given resource to the coordinator
+ * @param {String} hash content hash value
+ * @private
+ */
+WebCDN.prototype._lookup = function(hash) {
+    Statistics.mark("lookup_start:" + hash);
+    this._messenger.send('lookup', hash);
+};
+
+/**
+ * Downloads a given resouce from its CDN fallback URL
+ * @param {String} hash content hash value
+ * @private
+ */
+WebCDN.prototype._loadImageByCDN = function(hash) {
+    var self = this;
+    var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
+
+    if (this._bucketUrl) {
+        if (element.dataset.webcdnFallback.charAt(0) === '/') {
+            element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
         }
+        element.dataset.webcdnFallback = this._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
+    }
+
+    element.onload = function() {
+        element.dataset.webcdnData = getImageData(element);
+        Statistics.queryResourceTiming(this.dataset.webcdnFallback);
+        self._update([hash]);
     };
 
-    WebCDN.prototype._lookup = function(hash) {
-        this._messenger.send('lookup', hash);
-    };
+    element.setAttribute('crossOrigin', 'anonymous');
+    element.src = element.dataset.webcdnFallback;
+};
 
-    WebCDN.prototype._loadImageByCDN = function(hash) {
-        var self = this;
-        var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
-        element.onload = function() {
-            self._update([hash]);
-        };
-        if (this._bucketUrl) {
-            if (element.dataset.webcdnFallback.charAt(0) === '/') {
-                element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
-            }
-            element.dataset.webcdnFallback = this._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
+/**
+ * Querys user's current location and sends it to the coordinator server
+ * @private
+ */
+WebCDN.prototype._sendGeolocation = function() {
+    var self = this;
+    getCurrentPosition(function(err, position) {
+        if (!err && position) {
+            self._messenger.send('geolocation', position);
         }
-        getBase64FromImage(element.dataset.webcdnFallback, function(base64) {
-            element.src = base64;
-        }, function() {
-            element.src = element.dataset.webcdnFallback;
-        });
-    };
+    });
+};
 
-    WebCDN.prototype._sendGeolocation = function() {
-        var self = this;
-        getCurrentPosition(function(err, position) {
-            if (!err && position) {
-                self._messenger.send('geolocation', position);
-            }
-        });
-    };
+/**
+ * Draws a given image on a canvas element and returns it DataURL
+ * @function getImageData
+ * @param domElement 
+ * @returns {String}
+ */
+function getImageData(domElement) {
+    var canvas = document.createElement('canvas');
+    canvas.width = domElement.width;
+    canvas.height = domElement.height;
+    var context = canvas.getContext('2d');
+    context.drawImage(domElement, 0, 0, domElement.width, domElement.height);
+    var data = canvas.toDataURL("image/jpeg");
+    return data;
+};
 
+/**
+ * Returns query id from a given URL string
+ * @function getQueryId
+ * @param {String} url
+ * @returns {String}
+ */
+function getQueryId(url) {
+    var regex = /\?id=(\d*)/;
+    var result = regex.exec(url);
+    if (result && result[1]) {
+        return result[1];
+    } else {
+        return false;
+    }
+};
 
-    // helpers
-    function getImageData(domElement) {
-        var canvas = document.createElement('canvas');
-        canvas.width = domElement.width;
-        canvas.height = domElement.height;
-        var context = canvas.getContext('2d');
-        context.drawImage(domElement, 0, 0, domElement.width, domElement.height);
-        var data = canvas.toDataURL("image/jpeg");
-        return data;
-    };
-
-    function getBase64FromImage(url, onSuccess, onError) {
-        var xhr = new XMLHttpRequest();
-        xhr.responseType = "arraybuffer";
-        xhr.open("GET", url);
-        xhr.onload = function() {
-            var base64, binary, bytes, mediaType;
-
-            bytes = new Uint8Array(xhr.response);
-            //NOTE String.fromCharCode.apply(String, ...
-            //may cause "Maximum call stack size exceeded"
-            binary = [].map.call(bytes, function(byte) {
-                return String.fromCharCode(byte);
-            }).join('');
-            mediaType = xhr.getResponseHeader('content-type');
-            base64 = [
-                'data:',
-                mediaType ? mediaType + ';' : '',
-                'base64,',
-                btoa(binary)
-            ].join('');
-            onSuccess(base64);
-        };
-        xhr.onerror = onError;
-        xhr.send();
-    };
-
-    function getQueryId(url) {
-        var regex = /\?id=(\d*)/;
-        var result = regex.exec(url);
-        if (result && result[1]) {
-            return result[1];
-        } else {
-            return false;
-        }
-    };
-
-    window.WebCDN = WebCDN;
-})(window);
-
-},{"./lib/geo.js":14,"./lib/logger.js":15,"./lib/messenger.js":16,"./lib/peernet.js":18,"./lib/uuid.js":19,"events":5,"sha1":13,"util":9}]},{},[20]);
+},{"./lib/geo.js":14,"./lib/messenger.js":15,"./lib/peernet.js":17,"./lib/statistics.js":18,"./lib/uuid.js":19,"events":5,"sha1":13,"util":9}]},{},[20]);

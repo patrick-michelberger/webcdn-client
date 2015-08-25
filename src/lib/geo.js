@@ -1,3 +1,7 @@
+/**
+ * Receive user's current geolocation 
+ * @param {getCurrentPositionCallback} callback - The callback that handles the response.
+ */
 module.exports = function getCurrentPosition(callback) {
     var localGeolocation = getGeolocation();
     if (!localGeolocation) {
@@ -49,3 +53,12 @@ module.exports = function getCurrentPosition(callback) {
     };
 
 };
+
+/**
+ * getCurrentPosition callback
+ * @callback getCurrentPositionCallback
+ * @param {Object} error - 
+ * @param position
+ * @param {String} position.latitude - latitude value
+ * @param {String} position.longitude - longitude value
+ */

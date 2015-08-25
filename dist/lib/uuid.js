@@ -1,4 +1,7 @@
-// Generate UUID
+/** 
+ * Generates a unique user identification
+ * @return {String} uuid - unique user identification
+ */
 var UUID = (function() {
     function b(
         a // placeholder
