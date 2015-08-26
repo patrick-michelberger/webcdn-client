@@ -32,16 +32,24 @@ inherits(WebCDN, EventEmitter);
  * @constructor
  */
 function WebCDN(config) {
-    config = config ||  {};
     var self = this;
+
+    // Options
+    config = config ||  {};
     this._bucketUrl = config.bucketUrl ||  false;
     this._trackGeolocation = config.trackGeolocation ||  false;
-    this._items = []; // marked resources for WebCDN distribution
+    this.uuid = window.webcdn_uuid;
+
+    // Assets & caches
+    this._items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]')); // marked resources for WebCDN distribution
+
+    // Dependencies
     this._messenger = new Messenger();
     this._peernet = new Peernet({
         signalChannel: this._messenger
     });
 
+    // Event listeners
     this._messenger.on('lookup-response', function(data) {
         Statistics.mark("lookup_end:" + data.hash);
         if (data.peerid) {
@@ -63,12 +71,15 @@ function WebCDN(config) {
  */
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
-    var id = getQueryId(coordinatorUrl)
-    this.uuid = id ||  window.webcdn_uuid;
+    var id = getQueryId(coordinatorUrl);
+
     if (!id) {
-        coordinatorUrl += "?id=" + self.uuid;
+        coordinatorUrl += "?id=" + this.uuid;
+    } else {
+        this.uuid = id;
     }
 
+    // Geolocation available?
     if (this._trackGeolocation) {
         this.emit('geolocation:start');
         getCurrentPosition(function(err, position) {
@@ -80,6 +91,11 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
         });
     } else {
         connect(callback);
+    }
+
+    // AWS bucket available?
+    if (this._bucketUrl) {
+        bucketizeResources(this._items, this._bucketUrl);
     }
 
     function connect(callback) {
@@ -117,8 +133,7 @@ WebCDN.prototype._connect = function(url, callback) {
  * @private
  */
 WebCDN.prototype._initHashing = function() {
-    var items = this._items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
-    items.forEach(function(item) {
+    this._items.forEach(function(item) {
         item.dataset.webcdnHash = this._getItemHash(item);
     }, this);
 };
@@ -164,29 +179,36 @@ WebCDN.prototype._lookup = function(hash) {
 };
 
 /**
- * Downloads a given resouce from its CDN fallback URL
+ * Downloads a given resouce from its CDN fallback URL. CORS has to be enabled.
  * @param {String} hash content hash value
  * @private
  */
 WebCDN.prototype._loadImageByCDN = function(hash) {
     var self = this;
-    var element = document.querySelector('[data-webcdn-hash="' + hash + '"]')
-
-    if (this._bucketUrl) {
-        if (element.dataset.webcdnFallback.charAt(0) === '/') {
-            element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
+    var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
+    var url = element.dataset.webcdnFallback;
+    
+    var req = new XMLHttpRequest();
+    req.open('GET', url, true);
+    req.responseType = 'arraybuffer';
+    req.onerror = function(err) {
+        console.log("XHR Error: ", err);
+        element.setAttribute('crossOrigin', 'anonymous');
+        element.src = url;
+    };
+    req.onload = function(err) {
+        if (this.status == 200) {
+            var buffer = this.response;
+            var blob = new Blob([buffer], {type: 'application/octet-stream'});
+            element.src = window.URL.createObjectURL(blob);
+            Statistics.queryResourceTiming(url);
+            self._update([hash]);
+        } else {
+            console.log('XHR returned ' + this.status);
         }
-        element.dataset.webcdnFallback = this._bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
-    }
-
-    element.onload = function() {
-        element.dataset.webcdnData = getImageData(element);
-        Statistics.queryResourceTiming(this.dataset.webcdnFallback);
-        self._update([hash]);
     };
 
-    element.setAttribute('crossOrigin', 'anonymous');
-    element.src = element.dataset.webcdnFallback;
+    req.send();
 };
 
 /**
@@ -203,22 +225,6 @@ WebCDN.prototype._sendGeolocation = function() {
 };
 
 /**
- * Draws a given image on a canvas element and returns it DataURL
- * @function getImageData
- * @param domElement 
- * @returns {String}
- */
-function getImageData(domElement) {
-    var canvas = document.createElement('canvas');
-    canvas.width = domElement.width;
-    canvas.height = domElement.height;
-    var context = canvas.getContext('2d');
-    context.drawImage(domElement, 0, 0, domElement.width, domElement.height);
-    var data = canvas.toDataURL("image/jpeg");
-    return data;
-};
-
-/**
  * Returns query id from a given URL string
  * @function getQueryId
  * @param {String} url
@@ -232,4 +238,19 @@ function getQueryId(url) {
     } else {
         return false;
     }
+};
+
+/**
+ * Updates fallback URL of each element in the given array with a defined bucketUrl
+ * @function bucketizeResource
+ * @param {Array} DOMelements array of DOM elements with WebCDN fallback URL
+ * @param {String} bucketUrl
+ */
+function bucketizeResources(DOMelements, bucketUrl) {
+    DOMelements.forEach(function(element) {
+        if (element.dataset.webcdnFallback.charAt(0) === '/') {
+            element.dataset.webcdnFallback = element.dataset.webcdnFallback.slice(1);
+        }
+        element.dataset.webcdnFallback = bucketUrl + element.dataset.webcdnFallback.replace(/.*:?\/\//g, "");
+    });
 };
