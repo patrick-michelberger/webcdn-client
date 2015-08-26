@@ -3690,8 +3690,7 @@ function WebCDN(config) {
     var self = this;
     this._bucketUrl = config.bucketUrl ||  false;
     this._trackGeolocation = config.trackGeolocation ||  false;
-    this._items = {};
-    this._hashes = [];
+    this._items = []; // marked resources for WebCDN distribution
     this._messenger = new Messenger();
     this._peernet = new Peernet({
         signalChannel: this._messenger
@@ -3727,7 +3726,6 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
     if (this._trackGeolocation) {
         this.emit('geolocation:start');
         getCurrentPosition(function(err, position) {
-            console.log("current position: ", position);
             self.emit('geolocation:end');
             if (!err && position) {
                 coordinatorUrl += '&lat=' + position.latitude + '&lon=' + position.longitude;
@@ -3773,14 +3771,10 @@ WebCDN.prototype._connect = function(url, callback) {
  * @private
  */
 WebCDN.prototype._initHashing = function() {
-    var self = this;
-    var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
+    var items = this._items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
     items.forEach(function(item) {
-        var hash = self._getItemHash(item);
-        self._hashes.push(hash);
-        self._items[hash] = item.id;
-        item.dataset.webcdnHash = hash;
-    });
+        item.dataset.webcdnHash = this._getItemHash(item);
+    }, this);
 };
 
 /**
@@ -3808,9 +3802,9 @@ WebCDN.prototype._update = function(hashes) {
  * @private
  */
 WebCDN.prototype._initLookup = function() {
-    for (var hash in this._items) {
-        this.load(hash);
-    }
+    this._items.forEach(function(item) {
+        this.load(item.dataset.webcdnHash);
+    }, this);
 };
 
 /**
