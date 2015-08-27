@@ -19,6 +19,8 @@ function Peernet(options) {
     }
     var self = this;
     EventEmitter.call(this);
+    this.downloaded = {};
+    this.pending = {};
     this._peers = {};
     this._options = options;
     this._wrtc = options.wrtc === false ? undefined : getBrowserRTC() ||  options.wrtc;
@@ -42,6 +44,7 @@ Peernet.prototype.createConnection = function(peerId, hash) {
             "id": peerId,
             "hash": hash,
             "signalChannel": this._signalChannel,
+            "peernet": this,
             "stunUrl": this._stunUrl,
             "wrtc": this._wrtc
         };
@@ -93,3 +96,23 @@ Peernet.prototype._handleRelayMessage = function(data) {
         console.log('Hangup');
     }
 };
+
+Peernet.prototype.finishDownload = function(hash, content, callback) {
+    this.downloaded[hash] = content;
+    delete this.pending[hash];
+    this._update([{
+        hash: hash,
+        size: content.byteLength
+    }]);
+    callback(this.downloaded[hash]);
+};
+
+/**
+ * Send a "update" message to inform the coordinator about stored items
+ * @param {Array} hashes Content hashes computed by _getItemHash()
+ * @private
+ */
+Peernet.prototype._update = function(hashes) {
+    this._signalChannel.send('update', hashes);
+};
+

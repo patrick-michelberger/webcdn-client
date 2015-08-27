@@ -18,6 +18,7 @@ var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Messenger = require('./lib/messenger.js');
 var Tracker = require('./lib/tracker.js');
+var Download = require('./lib/download.js');
 var Peernet = require('./lib/peernet.js');
 var Statistics = require('./lib/statistics.js');
 var getCurrentPosition = require('./lib/geo.js');
@@ -104,8 +105,12 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
  * @pubic
  */
 WebCDN.prototype.load = function(hash) {
+    var self = this;
     this._tracker.getInfo(hash, function(data) {
-        console.log("response: ", data);
+        var download = new Download(data.peerid, data.hash, data.size, self._peernet, function(data, err) {
+            self.createObjectURLFromArrayBuffer(hash, data);
+        });
+        download.start();
     });
 };
 
@@ -142,15 +147,6 @@ WebCDN.prototype._getItemHash = function(item) {
 };
 
 /**
- * Send a "update" message to inform the coordinator about stored items
- * @param {Array} hashes Content hashes computed by _getItemHash()
- * @private
- */
-WebCDN.prototype._update = function(hashes) {
-    this._messenger.send('update', hashes);
-};
-
-/**
  * Iterates about each marked WebCDN items and executes a "lookup" request to the coordinator
  * @private
  */
@@ -158,39 +154,6 @@ WebCDN.prototype._initLookup = function() {
     this._items.forEach(function(item) {
         this.load(item.dataset.webcdnHash);
     }, this);
-};
-
-/**
- * Downloads a given resouce from its CDN fallback URL. CORS has to be enabled.
- * @param {String} hash content hash value
- * @private
- */
-WebCDN.prototype._loadImageByCDN = function(hash) {
-    var self = this;
-    var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
-    var url = element.dataset.webcdnFallback;
-    
-    var req = new XMLHttpRequest();
-    req.open('GET', url, true);
-    req.responseType = 'arraybuffer';
-    req.onerror = function(err) {
-        console.log("XHR Error: ", err);
-        element.setAttribute('crossOrigin', 'anonymous');
-        element.src = url;
-    };
-    req.onload = function(err) {
-        if (this.status == 200) {
-            var buffer = this.response;
-            var blob = new Blob([buffer], {type: 'application/octet-stream'});
-            element.src = window.URL.createObjectURL(blob);
-            Statistics.queryResourceTiming(url);
-            self._update([hash]);
-        } else {
-            console.log('XHR returned ' + this.status);
-        }
-    };
-
-    req.send();
 };
 
 /**
@@ -204,6 +167,45 @@ WebCDN.prototype._sendGeolocation = function() {
             self._messenger.send('geolocation', position);
         }
     });
+};
+
+/**
+ * @function createObjectURLFromArrayBuffer
+ * @param {DOMElement} element
+ * @param {ArrayBuffer} arrayBuffer
+ */
+WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
+    var blob;
+    var element = document.querySelector('[data-webcdn-hash="' + hash +'"]');
+    switch (element.tagName) {
+        case 'IMG':
+            console.log("downloading img");
+            blob = new Blob([arraybuffer], {
+                type: 'application/octet-stream'
+            });
+            element.src = window.URL.createObjectURL(blob);
+            break;
+        case 'SCRIPT':
+            console.log("downloading script");
+            blob = new Blob([arraybuffer], {
+                type: 'text/javascript'
+            });
+            element.src = window.URL.createObjectURL(blob);
+            break;
+        case 'LINK':
+            console.log("downloading css");
+            blob = new Blob([arraybuffer], {
+                type: 'text/css'
+            });
+            element.rel = "stylesheet";
+            element.href = window.URL.createObjectURL(blob);
+            break;
+        default:
+            blob = new Blob([arraybuffer], {
+                type: 'application/octet-stream'
+            });
+            element.src = window.URL.createObjectURL(blob);
+    }
 };
 
 /**

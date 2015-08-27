@@ -7,10 +7,10 @@ function Tracker(options) {
 };
 
 Tracker.prototype.getInfo = function(hash, callback) {
-	Statistics.mark("lookup_start:" + hash);
+	// Statistics.mark("lookup_start:" + hash);
     this._messenger.send('lookup', hash);
     this._messenger.once('lookup-response:' + hash, function(data) {
-    	Statistics.mark("lookup_end:" + data.hash);
+    	// Statistics.mark("lookup_end:" + data.hash);
         callback(data);
     });
 };
