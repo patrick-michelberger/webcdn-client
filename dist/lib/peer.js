@@ -28,6 +28,7 @@ function Peer(options) {
     this._stunUrl = options.stunUrl;
     this._pc = null;
     this._signalChannel = options.signalChannel;
+    this._peernet = options.peernet;
     this._reveiveChannel = null;
     this._isConnected = false;
     this._sendChannel = null;
@@ -112,7 +113,7 @@ Peer.prototype._createDataChannel = function(pc, label) {
     };
     dc.onopen = function() {
         console.log("WebRTC DataChannel", "OPEN");
-        Statistics.mark("pc_connect_end:" + self._id);
+        // Statistics.mark("pc_connect_end:" + self._id);
         self._fetchObjects();
     };
     return dc;
@@ -131,7 +132,7 @@ Peer.prototype._fetch = function(hash) {
         hash: hash
     };
     var msg_string = JSON.stringify(msg);
-    Statistics.mark("fetch_start:" + hash);
+    // Statistics.mark("fetch_start:" + hash);
     this._sendChannel.send(msg_string);
 };
 
@@ -146,19 +147,24 @@ Peer.prototype._gotReceiveChannel = function(event) {
 
 };
 
+
+/**
+ * Handler for DataChannel messages
+ * @function _handleMessage
+ */
 Peer.prototype._handleMessage = function(event) {
-    var msg = JSON.parse(event.data);
+    var msg = unmarshal(event.data);
+    console.log("received p2p message: ", msg);
     var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
+
     if (msg.type === 'fetch' && msg.hash) {
-        console.log("Send image", msg.hash);
+        // Request for resource from other peer
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
-        Statistics.mark("fetch_end:" + msg.hash);
-        if (i == 2) {
-            Statistics.measure();
-        }
-        i++;
-        console.log("Image received", msg.hash);
+        // End of received message 
+
+        console.log("this._imageData[msg.hash]: ", this._imageData[msg.hash]);
+        /*
         endimage.src = this._imageData[msg.hash];
         endimage.dataset.webcdnData = this._imageData[msg.hash];
         endimage.classList.add('webcdn-loaded');
@@ -172,9 +178,17 @@ Peer.prototype._handleMessage = function(event) {
             "hash": msg.hash,
             "size": base64_byte
         });
+        // Measurement code
+        Statistics.mark("fetch_end:" + msg.hash);
+        if (i == 2) {
+            Statistics.measure();
+        }
+        i++;
+        */
     } else if (msg.type === 'fetch-response') {
+        // Response for resource request
         if (!this._imageData[msg.hash]) {
-            this._imageData[msg.hash] = msg.data;
+            this._imageData[msg.hash] = msg.data; // First chunk
         } else {
             this._imageData[msg.hash] += msg.data;
         }
@@ -255,45 +269,83 @@ Peer.prototype._createEventHandler = function(name) {
 };
 
 Peer.prototype._sendImage = function(hash) {
-    Statistics.mark("sendImage_start:" + hash);
+    // Statistics.mark("sendImage_start:" + hash);
     var self = this;
-    var imageToShare = document.querySelector('[data-webcdn-hash="' + hash + '"]');
-    var chunkSize = 16384; // 16 KB 
+    var chunkSize = 25 * 1024;
     var dataSent = 0;
-    var data = imageToShare.dataset.webcdnData;
 
-    var sendAllData = function() {
-        while (dataSent < data.length) {
-            var slideEndIndex = dataSent + chunkSize;
-            if (slideEndIndex > data.length) {
-                slideEndIndex = data.length;
-            }
+    if (this._peernet.downloaded.hasOwnProperty(hash)) {
+        var data = this._peernet.downloaded[hash];
+        var downloadSize = data.byteLength;
 
-            if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
-                console.log("bufferedAmount ist too high! Slow down...");
-                setTimeout(sendAllData, 250);
-                return;
-            }
+        var sendAllData = function() {
+            while (dataSent < downloadSize) {
+                var slideEndIndex = dataSent + chunkSize;
+                if (slideEndIndex > downloadSize) {
+                    slideEndIndex = downloadSize;
+                }
 
-            var msg = {
-                type: "fetch-response",
-                hash: hash,
-                data: data.slice(dataSent, slideEndIndex)
-            };
+                if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
+                    console.log("bufferedAmount ist too high! Slow down...");
+                    setTimeout(sendAllData, 250);
+                    return;
+                }
 
-            self._sendChannel.send(JSON.stringify(msg));
-            dataSent = slideEndIndex;
-            if (dataSent + 1 >= data.length) {
-                console.log("All data chunks for " + hash + " have been sent to ", self._id);
                 var msg = {
                     type: "fetch-response",
                     hash: hash,
-                    data: "\n"
+                    data: data.slice(dataSent, slideEndIndex)
                 };
-                self._sendChannel.send(JSON.stringify(msg));
-            }
-        }
-    };
 
-    setTimeout(sendAllData, 0);
+                self._sendChannel.send(marshal(msg));
+                dataSent = slideEndIndex;
+                if (dataSent + 1 >= downloadSize) {
+                    console.log("All data chunks for " + hash + " have been sent to ", self._id);
+                    var msg = {
+                        type: "fetch-response",
+                        hash: hash,
+                        data: "\n"
+                    };
+                    self._sendChannel.send(JSON.stringify(msg));
+                }
+            }
+        };
+        sendAllData();
+    }
+};
+
+// Helper functions
+function marshalBuffer(buffer) {
+  var binary = '';
+  var bytes = new Uint8Array(buffer);
+  var len = bytes.byteLength;
+  for (var i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
+function unmarshalBuffer(base64) {
+  var binaryString =  window.atob(base64);
+  var len = binaryString.length;
+  var bytes = new Uint8Array(len);
+  for (var i = 0; i < len; i++)        {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+function marshal(message) {  
+  if (message.data instanceof ArrayBuffer) {
+    message.data = marshalBuffer(message.data);
+  }
+  return JSON.stringify(message);
+};
+
+function unmarshal(data) {
+  var message = JSON.parse(data);
+  if (message.hasOwnProperty('data')) {
+    message.data = unmarshalBuffer(message.data);
+  }
+  return message;
 };
