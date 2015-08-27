@@ -82,6 +82,6 @@ Messenger.prototype._handleRelayMessage = function(data) {
     this.emit("relay", data);
 };
 
-Messenger.prototype._handleLookupResponse = function(peerId) {
-    this.emit('lookup-response', peerId);
+Messenger.prototype._handleLookupResponse = function(data) {
+    this.emit('lookup-response:' + data.hash, data);
 };

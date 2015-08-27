@@ -17,6 +17,7 @@ var sha1 = require('sha1');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Messenger = require('./lib/messenger.js');
+var Tracker = require('./lib/tracker.js');
 var Peernet = require('./lib/peernet.js');
 var Statistics = require('./lib/statistics.js');
 var getCurrentPosition = require('./lib/geo.js');
@@ -45,21 +46,11 @@ function WebCDN(config) {
 
     // Dependencies
     this._messenger = new Messenger();
+    this._tracker = new Tracker({
+        messenger: this._messenger
+    });
     this._peernet = new Peernet({
         signalChannel: this._messenger
-    });
-
-    // Event listeners
-    this._messenger.on('lookup-response', function(data) {
-        Statistics.mark("lookup_end:" + data.hash);
-        if (data.peerid) {
-            Statistics.mark("pc_connect_start:" + data.peerid);
-            var peer = self._peernet.createConnection(data.peerid, data.hash);
-            peer.doOffer();
-        } else {
-            // CDN Fallback
-            self._loadImageByCDN(data.hash);
-        }
     });
 };
 
@@ -113,7 +104,9 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
  * @pubic
  */
 WebCDN.prototype.load = function(hash) {
-    this._lookup(hash);
+    this._tracker.getInfo(hash, function(data) {
+        console.log("response: ", data);
+    });
 };
 
 /**
@@ -148,7 +141,6 @@ WebCDN.prototype._getItemHash = function(item) {
     return hash;
 };
 
-
 /**
  * Send a "update" message to inform the coordinator about stored items
  * @param {Array} hashes Content hashes computed by _getItemHash()
@@ -166,16 +158,6 @@ WebCDN.prototype._initLookup = function() {
     this._items.forEach(function(item) {
         this.load(item.dataset.webcdnHash);
     }, this);
-};
-
-/**
- * Send a "lookup" message for a given resource to the coordinator
- * @param {String} hash content hash value
- * @private
- */
-WebCDN.prototype._lookup = function(hash) {
-    Statistics.mark("lookup_start:" + hash);
-    this._messenger.send('lookup', hash);
 };
 
 /**
