@@ -13,7 +13,7 @@ var i = 0;
  * @param {String} options.id - unique peerId
  * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
  * @param {Object} options.wrtc - WebRTC implementation object
- * @param {String} options.stunUrl - URL for Session Traversal Utilities for NAT (STUN) server
+ * @param {Array} options.iceUrls - Array of URLs for Session Traversal Utilities for NAT (STUN) or TURN servers 
  * @param {String} options.hash - unique hash value for given resource
  * @constructor 
  */
@@ -25,7 +25,7 @@ function Peer(options) {
     if (options.hash) {
         this._hashes.push(options.hash);
     }
-    this._stunUrl = options.stunUrl;
+    this._iceUrls = options.iceUrls;
     this._pc = null;
     this._signalChannel = options.signalChannel;
     this._peernet = options.peernet;
@@ -61,10 +61,7 @@ Peer.prototype.addHash = function(hash) {
 Peer.prototype._createPeerConnection = function() {
     var self = this;
     var servers = {
-        iceServers: [{
-            url: this._stunUrl,
-            urls: [this._stunUrl]
-        }]
+        iceServers: this._iceUrls
     };
     var constraints = {};
     var pc = new this._wrtc.RTCPeerConnection(servers, constraints);

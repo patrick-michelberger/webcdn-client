@@ -24,12 +24,25 @@ function Peernet(options) {
     this._peers = {};
     this._options = options;
     this._wrtc = options.wrtc === false ? undefined : getBrowserRTC() ||  options.wrtc;
-    this._stunUrl = options.stunUrl || "stun:stun.l.google.com:19302";
+    this._iceUrls = options.iceUrls || [{
+        url: "stun:stun.l.google.com:19302"
+    }, {
+        url: "stun:stun1.l.google.com:19302"
+    }, {
+        url: "stun:stun2.l.google.com:19302"
+    }, {
+        url: "stun:stun3.l.google.com:19302"
+    }, {
+        url: "stun:stun4.l.google.com:19302"
+    }];
     this._signalChannel = options.signalChannel;
     this._signalChannel.on('relay', function(data) {
         self._handleRelayMessage.call(self, data);
     });
 };
+
+
+Peernet.prototype.
 
 /** 
  * Create a peer connection with given peer id for a given resource hash value. 
@@ -45,7 +58,7 @@ Peernet.prototype.createConnection = function(peerId, hash) {
             "hash": hash,
             "signalChannel": this._signalChannel,
             "peernet": this,
-            "stunUrl": this._stunUrl,
+            "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
         };
         this._peers[peerId] = new Peer(options);
@@ -115,4 +128,3 @@ Peernet.prototype.finishDownload = function(hash, content, callback) {
 Peernet.prototype._update = function(hashes) {
     this._signalChannel.send('update', hashes);
 };
-
