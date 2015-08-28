@@ -3397,20 +3397,24 @@ Peer.prototype._sendImage = function(hash) {
                     slideEndIndex = downloadSize;
                 }
 
+                // Slow down control
                 if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
                     console.log("bufferedAmount ist too high! Slow down...");
                     setTimeout(sendAllData, 250);
                     return;
                 }
 
+                // Create & send chunk 
+                var chunk = data.slice(dataSent, slideEndIndex);
                 var msg = {
                     type: "fetch-response",
                     hash: hash,
-                    data: data.slice(dataSent, slideEndIndex)
+                    data: chunk
                 };
-
                 self._sendChannel.send(marshal(msg));
                 dataSent = slideEndIndex;
+
+                // Create & send end mark
                 if (dataSent + 1 >= downloadSize) {
                     console.log("All data chunks for " + hash + " have been sent to ", self._id);
                     var msg = {
@@ -3577,7 +3581,6 @@ Peernet.prototype._handleRelayMessage = function(data) {
         var peer = this._createConnection(data.from, false);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
         //console.log("answer from: ", msg.from);
