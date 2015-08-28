@@ -24,11 +24,58 @@ function Peernet(options) {
     this._peers = {};
     this._options = options;
     this._wrtc = options.wrtc === false ? undefined : getBrowserRTC() ||  options.wrtc;
-    this._stunUrl = options.stunUrl || "stun:stun.l.google.com:19302";
+    this._iceUrls = options.iceUrls || [{
+        url: "stun:stun.l.google.com:19302"
+    }, {
+        url: "stun:stun1.l.google.com:19302"
+    }, {
+        url: "stun:stun2.l.google.com:19302"
+    }, {
+        url: "stun:stun3.l.google.com:19302"
+    }, {
+        url: "stun:stun4.l.google.com:19302"
+    }];
     this._signalChannel = options.signalChannel;
     this._signalChannel.on('relay', function(data) {
         self._handleRelayMessage.call(self, data);
     });
+};
+
+Peernet.prototype.fetch = function(peerid, hash, callback) {
+    console.log("fetch resource: ", hash);
+    var data = {
+        type: 'fetch',
+        hash: hash
+    };
+    this._send(peerid, data, callback);
+};
+
+Peernet.prototype._send = function(peerId, data, callback) {
+    var peer = this._createConnection(peerId, true);
+    peer.callbacks[data.hash] = callback;
+    var dataChannel = peer._sendChannel;
+    data = JSON.stringify(data);
+    if (typeof(dataChannel) === 'undefined' || dataChannel === null || dataChannel.readyState === 'closing' || dataChannel.readyState === 'closed') {
+        // TODO this.reset(peer);
+        return;
+    }
+    if (dataChannel.readyState === 'open') {
+        console.log("dataChannel.readyState: ", dataChannel.readyState);
+        dataChannel.send(data);
+    } else if (dataChannel.readyState === 'connecting') {
+        console.log("dataChannel.readyState: ", dataChannel.readyState);
+        // queue data
+        if (dataChannel.hasOwnProperty("queued")) {
+            dataChannel.queued.push(data);
+        } else {
+            dataChannel.queued = [data];
+        }
+        dataChannel.onopen = function(event) {
+            for (var i = 0; i < dataChannel.queued.length; i++) {
+                dataChannel.send(dataChannel.queued[i]);
+            }
+        };
+    }
 };
 
 /** 
@@ -37,26 +84,20 @@ function Peernet(options) {
  * @param {String} hash - unique resource hash value
  * @return {Peer}
  */
-Peernet.prototype.createConnection = function(peerId, hash) {
-    var self = this;
+Peernet.prototype._createConnection = function(peerId, originator) {
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,
-            "hash": hash,
             "signalChannel": this._signalChannel,
             "peernet": this,
-            "stunUrl": this._stunUrl,
-            "wrtc": this._wrtc
+            "iceUrls": this._iceUrls,
+            "wrtc": this._wrtc,
+            "originator": originator
         };
         this._peers[peerId] = new Peer(options);
-        this._peers[peerId].on('update', function(hash) {
-            self._signalChannel.send('update', [hash]);
-        });
         this._peers[peerId].on('upload_ratio', function(data) {
-            self._signalChannel.send('upload_ratio', data);
-        });
-    } else {
-        this._peers[peerId].addHash(hash);
+            this._signalChannel.send('upload_ratio', data);
+        }, this);
     }
     return this._peers[peerId];
 };
@@ -67,14 +108,14 @@ Peernet.prototype._handleRelayMessage = function(data) {
     var self = this;
     if (msg && msg.data && msg.data.type === 'offer') {
         //console.log("offer from: ", msg.from);
-        var peer = this.createConnection(data.from);
+        var peer = this._createConnection(data.from, false);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
         console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
         //console.log("answer from: ", msg.from);
-        var peer = this.createConnection(data.from);
+        var peer = this._createConnection(data.from, false);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
         console.log("answer: ", peer._otherCandidates);
@@ -115,4 +156,3 @@ Peernet.prototype.finishDownload = function(hash, content, callback) {
 Peernet.prototype._update = function(hashes) {
     this._signalChannel.send('update', hashes);
 };
-

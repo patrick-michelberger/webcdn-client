@@ -179,14 +179,15 @@ WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var element = document.querySelector('[data-webcdn-hash="' + hash +'"]');
     switch (element.tagName) {
         case 'IMG':
-            console.log("downloading img");
             blob = new Blob([arraybuffer], {
                 type: 'application/octet-stream'
             });
+            console.log(blob);
             element.src = window.URL.createObjectURL(blob);
+            console.log("lement.src:", element.src);
+
             break;
         case 'SCRIPT':
-            console.log("downloading script");
             blob = new Blob([arraybuffer], {
                 type: 'text/javascript'
             });
