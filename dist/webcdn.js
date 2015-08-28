@@ -2929,19 +2929,36 @@ function Download(peerid, hash, size, peernet, callback) {
 };
 
 Download.prototype.start = function() {
+    var self = this;
     if (this.peerid) {
         // Statistics.mark("pc_connect_start:" + this.peerid);
-        var peer = this.peernet.createConnection(this.peerid, this.hash);
-        peer.doOffer();
+        var peer = this.peernet.fetch(this.peerid, this.hash, function(chunks)  {
+            self.finish(chunks);
+        });
     } else {
         // CDN Fallback
         this._loadImageByCDN(this.hash);
     }
 };
 
-Download.prototype.finish = function() {
-	var content = new ArrayBuffer(this.size);
-	this.peernet.finishDownload(this.hash, content, this.done);
+Download.prototype.finish = function(data) {
+    /* TODO
+       endimage.classList.add('webcdn-loaded');
+       this.emit('upload_ratio', {
+           "from": this._id,
+           "to": event.target.label,
+           "hash": msg.hash,
+           "size": base64_byte
+       });
+       this._signalChannel.send('upload_ratio', data);
+       // Measurement code
+       Statistics.mark("fetch_end:" + msg.hash);
+       if (i == 2) {
+           Statistics.measure();
+       }
+       i++;
+    */
+    this.peernet.finishDownload(this.hash, data, this.done);
 };
 
 /**
@@ -2965,7 +2982,7 @@ Download.prototype._loadImageByCDN = function(hash) {
     req.onload = function(err) {
         if (this.status == 200) {
             var content = this.response;
-           	self.peernet.finishDownload(self.hash, content, self.done);
+            self.peernet.finishDownload(self.hash, content, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
             console.log('XHR returned ' + this.status);
@@ -2974,6 +2991,7 @@ Download.prototype._loadImageByCDN = function(hash) {
 
     req.send();
 };
+
 },{"./statistics.js":19}],15:[function(require,module,exports){
 /**
  * Receive user's current geolocation 
@@ -3143,28 +3161,26 @@ var i = 0;
  * @param {String} options.id - unique peerId
  * @param {Object} options.signalChannel - websocket connection for WebRTC signaling channel
  * @param {Object} options.wrtc - WebRTC implementation object
- * @param {String} options.stunUrl - URL for Session Traversal Utilities for NAT (STUN) server
+ * @param {Array} options.iceUrls - Array of URLs for Session Traversal Utilities for NAT (STUN) or TURN servers 
  * @param {String} options.hash - unique hash value for given resource
  * @constructor 
  */
 function Peer(options) {
     EventEmitter.call(this);
+    this.callbacks = {};
     this._id = options.id;
     this._wrtc = options.wrtc;
     this._hashes = [];
-    if (options.hash) {
-        this._hashes.push(options.hash);
-    }
-    this._stunUrl = options.stunUrl;
+    this._iceUrls = options.iceUrls;
     this._pc = null;
     this._signalChannel = options.signalChannel;
     this._peernet = options.peernet;
     this._reveiveChannel = null;
     this._isConnected = false;
     this._sendChannel = null;
-    this._imageData = {};
     this._otherCandidates = [];
     this._otherSDP = false;
+    this._originator = options.originator;
     this.init();
 };
 
@@ -3172,10 +3188,8 @@ function Peer(options) {
  * Creates a RTCPeerConnection and a DataChannel with given peer.
  */
 Peer.prototype.init = function() {
-    var self = this;
-    var label = self._id;
-    self._pc = self._createPeerConnection();
-    self._sendChannel = self._createDataChannel(self.pc, label);
+    this._pc = this._createPeerConnection();
+    this._sendChannel = this._createDataChannel(this._pc, this._id);
 };
 
 /**
@@ -3191,10 +3205,7 @@ Peer.prototype.addHash = function(hash) {
 Peer.prototype._createPeerConnection = function() {
     var self = this;
     var servers = {
-        iceServers: [{
-            url: this._stunUrl,
-            urls: [this._stunUrl]
-        }]
+        iceServers: this._iceUrls
     };
     var constraints = {};
     var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
@@ -3206,19 +3217,14 @@ Peer.prototype._createPeerConnection = function() {
     pc.onremovestream = this._createEventHandler(name + " onremovestream");
     // ICE handlers
     pc.onicecandidate = function(event) {
-        self._iceCallback.call(self, event);
-    };
-    pc.oniceconnectionstatechange = function(evt) {
-        var connectionState = evt.target.iceConnectionState;
-        if (connectionState === 'connected' || connectionState === 'completed') {
-            console.log("peerconnection status: connected");
-        } else {
-            console.log("peerconnection status: closed");
+        if (event.candidate && self._originator === true) {
+            self._iceCallback.call(self, event);
         }
     };
-    // Date channel handlers
-    pc.ondatachannel = function(event) {
-        self._gotReceiveChannel.call(self, event);
+    pc.onnegotiationneeded = function() {
+        if (self._originator === true) {
+            self.doOffer();
+        }
     };
     return pc;
 };
@@ -3228,23 +3234,22 @@ Peer.prototype._createDataChannel = function(pc, label) {
     var constraints = {
         ordered: true
     };
+
+    // Date channel handlers
+    pc.ondatachannel = function(event) {
+        self._gotReceiveChannel.call(self, event);
+    };
+
     var dc = self._pc.createDataChannel(label, constraints);
-    var name = "dataChannel";
     // Event handlers 
     dc.onclose = function() {
         console.log("dataChannel close");
-        self._createEventHandler(name + " onclose");
     };
     dc.onerror = function(err) {
         console.log("dc.onerror: ", err);
     };
     dc.onmessage = function(event) {
         self._handleMessage.call(self, event);
-    };
-    dc.onopen = function() {
-        console.log("WebRTC DataChannel", "OPEN");
-        // Statistics.mark("pc_connect_end:" + self._id);
-        self._fetchObjects();
     };
     return dc;
 };
@@ -3284,7 +3289,6 @@ Peer.prototype._gotReceiveChannel = function(event) {
  */
 Peer.prototype._handleMessage = function(event) {
     var msg = unmarshal(event.data);
-    console.log("received p2p message: ", msg);
     var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
 
     if (msg.type === 'fetch' && msg.hash) {
@@ -3292,35 +3296,13 @@ Peer.prototype._handleMessage = function(event) {
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
         // End of received message 
-
-        console.log("this._imageData[msg.hash]: ", this._imageData[msg.hash]);
-        /*
-        endimage.src = this._imageData[msg.hash];
-        endimage.dataset.webcdnData = this._imageData[msg.hash];
-        endimage.classList.add('webcdn-loaded');
-        var base64 = this._imageData[msg.hash].replace('data:application/octet-stream;base64,', '');
-        var base64_byte = base64.length * 6 / 8;
-        delete this._imageData[msg.hash];
-        this.emit('update', msg.hash);
-        this.emit('upload_ratio', {
-            "from": this._id,
-            "to": event.target.label,
-            "hash": msg.hash,
-            "size": base64_byte
-        });
-        // Measurement code
-        Statistics.mark("fetch_end:" + msg.hash);
-        if (i == 2) {
-            Statistics.measure();
-        }
-        i++;
-        */
+        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
-        if (!this._imageData[msg.hash]) {
-            this._imageData[msg.hash] = msg.data; // First chunk
+        if (!this._peernet.pending[msg.hash]) {
+            this._peernet.pending[msg.hash] = [msg.data]; // First chunk
         } else {
-            this._imageData[msg.hash] += msg.data;
+            this._peernet.pending[msg.hash].push(msg.data);
         }
     }
 };
@@ -3446,39 +3428,42 @@ Peer.prototype._sendImage = function(hash) {
 
 // Helper functions
 function marshalBuffer(buffer) {
-  var binary = '';
-  var bytes = new Uint8Array(buffer);
-  var len = bytes.byteLength;
-  for (var i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return window.btoa(binary);
+    var binary = '';
+    var bytes = new Uint8Array(buffer);
+    var len = bytes.byteLength;
+    for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
 };
 
 function unmarshalBuffer(base64) {
-  var binaryString =  window.atob(base64);
-  var len = binaryString.length;
-  var bytes = new Uint8Array(len);
-  for (var i = 0; i < len; i++)        {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
+    var binaryString = window.atob(base64);
+    var len = binaryString.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
 };
 
-function marshal(message) {  
-  if (message.data instanceof ArrayBuffer) {
-    message.data = marshalBuffer(message.data);
-  }
-  return JSON.stringify(message);
+function marshal(message) {
+    if (message.data instanceof ArrayBuffer) {
+        message.data = marshalBuffer(message.data);
+    }
+    return JSON.stringify(message);
 };
 
 function unmarshal(data) {
-  var message = JSON.parse(data);
-  if (message.hasOwnProperty('data')) {
-    message.data = unmarshalBuffer(message.data);
-  }
-  return message;
+    var message = JSON.parse(data);
+    if (message.hasOwnProperty('data')) {
+        if (message.data !== "\n") {
+            message.data = unmarshalBuffer(message.data);
+        }
+    }
+    return message;
 };
+
 },{"./statistics.js":19,"events":5,"util":9}],18:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
@@ -3506,11 +3491,56 @@ function Peernet(options) {
     this._peers = {};
     this._options = options;
     this._wrtc = options.wrtc === false ? undefined : getBrowserRTC() ||  options.wrtc;
-    this._stunUrl = options.stunUrl || "stun:stun.l.google.com:19302";
+    this._iceUrls = options.iceUrls || [{
+        url: "stun:stun.l.google.com:19302"
+    }, {
+        url: "stun:stun1.l.google.com:19302"
+    }, {
+        url: "stun:stun2.l.google.com:19302"
+    }, {
+        url: "stun:stun3.l.google.com:19302"
+    }, {
+        url: "stun:stun4.l.google.com:19302"
+    }];
     this._signalChannel = options.signalChannel;
     this._signalChannel.on('relay', function(data) {
         self._handleRelayMessage.call(self, data);
     });
+};
+
+Peernet.prototype.fetch = function(peerid, hash, callback) {
+    var data = {
+        type: 'fetch',
+        hash: hash
+    };
+    this._send(peerid, data, callback);
+};
+
+Peernet.prototype._send = function(peerId, data, callback) {
+    var peer = this._createConnection(peerId, true);
+    peer.callbacks[data.hash] = callback;
+    var dataChannel = peer._sendChannel;
+    data = JSON.stringify(data);
+    if (typeof(dataChannel) === 'undefined' || dataChannel === null || dataChannel.readyState === 'closing' || dataChannel.readyState === 'closed') {
+        // TODO this.reset(peer);
+        return;
+    }
+    if (dataChannel.readyState === 'open') {
+        dataChannel.send(data);
+    } else if (dataChannel.readyState === 'connecting') {
+        // queue data
+        if (dataChannel.hasOwnProperty("queued")) {
+            dataChannel.queued.push(data);
+        } else {
+            dataChannel.queued = [data];
+        }
+        dataChannel.onopen = function(event) {
+            // Statistics.mark("pc_connect_end:" + self._id);
+            for (var i = 0; i < dataChannel.queued.length; i++) {
+                dataChannel.send(dataChannel.queued[i]);
+            }
+        };
+    }
 };
 
 /** 
@@ -3519,26 +3549,21 @@ function Peernet(options) {
  * @param {String} hash - unique resource hash value
  * @return {Peer}
  */
-Peernet.prototype.createConnection = function(peerId, hash) {
+Peernet.prototype._createConnection = function(peerId, originator) {
     var self = this;
     if (!this._peers[peerId]) {
         var options = {
             "id": peerId,
-            "hash": hash,
+            "originator": originator,
             "signalChannel": this._signalChannel,
             "peernet": this,
-            "stunUrl": this._stunUrl,
+            "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
         };
         this._peers[peerId] = new Peer(options);
-        this._peers[peerId].on('update', function(hash) {
-            self._signalChannel.send('update', [hash]);
-        });
         this._peers[peerId].on('upload_ratio', function(data) {
             self._signalChannel.send('upload_ratio', data);
         });
-    } else {
-        this._peers[peerId].addHash(hash);
     }
     return this._peers[peerId];
 };
@@ -3549,20 +3574,18 @@ Peernet.prototype._handleRelayMessage = function(data) {
     var self = this;
     if (msg && msg.data && msg.data.type === 'offer') {
         //console.log("offer from: ", msg.from);
-        var peer = this.createConnection(data.from);
+        var peer = this._createConnection(data.from, false);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
         console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
         //console.log("answer from: ", msg.from);
-        var peer = this.createConnection(data.from);
+        var peer = this._createConnection(data.from, false);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        console.log("answer: ", peer._otherCandidates);
         for (var i = 0; i < peer._otherCandidates.length; i++) {
             if (peer._otherCandidates[i]) {
-                console.log("handle 'answer': this_otherCandidates: ", peer._otherCandidates[i]);
                 peer._pc.addIceCandidate(peer._otherCandidates[i]);
             }
         }
@@ -3597,7 +3620,6 @@ Peernet.prototype.finishDownload = function(hash, content, callback) {
 Peernet.prototype._update = function(hashes) {
     this._signalChannel.send('update', hashes);
 };
-
 
 },{"./peer.js":17,"events":5,"get-browser-rtc":10,"util":9}],19:[function(require,module,exports){
 var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
@@ -3985,21 +4007,18 @@ WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var element = document.querySelector('[data-webcdn-hash="' + hash +'"]');
     switch (element.tagName) {
         case 'IMG':
-            console.log("downloading img");
             blob = new Blob([arraybuffer], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'SCRIPT':
-            console.log("downloading script");
             blob = new Blob([arraybuffer], {
                 type: 'text/javascript'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'LINK':
-            console.log("downloading css");
             blob = new Blob([arraybuffer], {
                 type: 'text/css'
             });
