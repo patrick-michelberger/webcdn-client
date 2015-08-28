@@ -110,7 +110,6 @@ Peernet.prototype._handleRelayMessage = function(data) {
         var peer = this._createConnection(data.from, false);
         peer._otherSDP = msg.data;
         peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        console.log("handle 'offer': this_otherCandidates: ", peer._otherCandidates);
         peer.doAnswer();
     } else if (msg && msg.data && msg.data.type === 'answer' && started) {
         //console.log("answer from: ", msg.from);
