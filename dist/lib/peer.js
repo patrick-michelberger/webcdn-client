@@ -5,8 +5,6 @@ var Statistics = require('./statistics.js');
 module.exports = Peer;
 inherits(Peer, EventEmitter);
 
-var i = 0;
-
 /**
  * Wrapper for setting up and maintaining peer connection with another peer
  * @param options 
@@ -19,20 +17,22 @@ var i = 0;
  */
 function Peer(options) {
     EventEmitter.call(this);
+
+    // Properties
+    this.connection = null;
+    this.dataChannel = null;
     this.callbacks = {};
+
     this._id = options.id;
     this._wrtc = options.wrtc;
-    this._hashes = [];
     this._iceUrls = options.iceUrls;
-    this._pc = null;
+    this._originator = options.originator ||  false;
+
+    // Dependencis
     this._signalChannel = options.signalChannel;
+    this._logger = options.logger;
     this._peernet = options.peernet;
-    this._reveiveChannel = null;
-    this._isConnected = false;
-    this._sendChannel = null;
-    this._otherCandidates = [];
-    this._otherSDP = false;
-    this._originator = options.originator;
+
     this.init();
 };
 
@@ -40,33 +40,37 @@ function Peer(options) {
  * Creates a RTCPeerConnection and a DataChannel with given peer.
  */
 Peer.prototype.init = function() {
-    this._pc = this._createPeerConnection();
-    this._sendChannel = this._createDataChannel(this._pc, this._id);
+    this.connection = this._createPeerConnection();
+    this.dataChannel = this._createDataChannel(this.connection, this._id);
 };
 
-/**
- * Add resource hash to peer hash array. Indicates peer is storing this given resource.
- * @param {String} hash - unique resource hash value
- */
-Peer.prototype.addHash = function(hash) {
-    if (hash) {
-        this._hashes.push(hash);
-    }
+Peer.prototype.doOffer = function() {
+    var self = this;
+    self.connection.createOffer(function(sessionDescription) {
+        self._setLocalAndSendMessage.call(self, sessionDescription);
+    }, self._logger.handleError);
+};
+
+Peer.prototype.doAnswer = function() {
+    var self = this;
+    self.connection.createAnswer(function(sessionDescription) {
+        self._setLocalAndSendMessage.call(self, sessionDescription);
+    }, self._logger.handleError);
+};
+
+Peer.prototype.setIceCandidates = function(candidate) {
+    var iceCandidate = new this._wrtc.RTCIceCandidate({
+        candidate: candidate
+    });
+    this.connection.addIceCandidate(iceCandidate);
 };
 
 Peer.prototype._createPeerConnection = function() {
     var self = this;
-    var servers = {
+    var pc = new this._wrtc.RTCPeerConnection({
         iceServers: this._iceUrls
-    };
-    var constraints = {};
-    var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
-    var name = "peerConnection_" + this._id;
-    // General event handlers 
-    pc.onconnecting = this._createEventHandler(name + " onconnecting");
-    pc.onopen = this._createEventHandler(name + " onopen");
-    pc.onaddstream = this._createEventHandler(name + " onaddstream");
-    pc.onremovestream = this._createEventHandler(name + " onremovestream");
+    });
+
     // ICE handlers
     pc.onicecandidate = function(event) {
         if (event.candidate && self._originator === true) {
@@ -78,62 +82,24 @@ Peer.prototype._createPeerConnection = function() {
             self.doOffer();
         }
     };
+
+    // DateChannel creation handler (other peer)
+    pc.ondatachannel = function(event) {
+        event.channel.onmessage = function(event) {
+            self._handleMessage.call(self, event);
+        };
+    };
     return pc;
 };
 
 Peer.prototype._createDataChannel = function(pc, label) {
     var self = this;
-    var constraints = {
-        ordered: true
-    };
-
-    // Date channel handlers
-    pc.ondatachannel = function(event) {
-        self._gotReceiveChannel.call(self, event);
-    };
-
-    var dc = self._pc.createDataChannel(label, constraints);
-    // Event handlers 
-    dc.onclose = function() {
-        console.log("dataChannel close");
-    };
-    dc.onerror = function(err) {
-        console.log("dc.onerror: ", err);
-    };
+    var dc = self.connection.createDataChannel(label);
     dc.onmessage = function(event) {
         self._handleMessage.call(self, event);
     };
     return dc;
 };
-
-Peer.prototype._fetchObjects = function() {
-    var self = this;
-    self._hashes.forEach(function(hash) {
-        self._fetch(hash);
-    });
-};
-
-Peer.prototype._fetch = function(hash) {
-    var msg = {
-        type: 'fetch',
-        hash: hash
-    };
-    var msg_string = JSON.stringify(msg);
-    // Statistics.mark("fetch_start:" + hash);
-    this._sendChannel.send(msg_string);
-};
-
-Peer.prototype._gotReceiveChannel = function(event) {
-    var self = this;
-    this._receiveChannel = event.channel;
-    this._receiveChannel.onmessage = function(event) {
-        self._handleMessage.call(self, event);
-    };
-    this._receiveChannel.onopen = function() {};
-    this._receiveChannel.onclose = function() {};
-
-};
-
 
 /**
  * Handler for DataChannel messages
@@ -141,95 +107,39 @@ Peer.prototype._gotReceiveChannel = function(event) {
  */
 Peer.prototype._handleMessage = function(event) {
     var msg = unmarshal(event.data);
-    var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
-
     if (msg.type === 'fetch' && msg.hash) {
         // Request for resource from other peer
         this._sendImage(msg.hash);
-    } else if (msg.data == "\n") {
-        // End of received message 
-        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
         if (!this._peernet.pending[msg.hash]) {
+            console.log("Adding first chunk...");
             this._peernet.pending[msg.hash] = [msg.data]; // First chunk
         } else {
+            console.log("Adding chunk " + Object.keys(this._peernet.pending).length);
             this._peernet.pending[msg.hash].push(msg.data);
         }
-    }
-};
-
-Peer.prototype._relay = function(data) {
-    this._signalChannel.send('relay', data, this._id);
-};
-
-Peer.prototype.doOffer = function() {
-    var self = this;
-    var constraints = {};
-    if (!self._isConnected) {
-        self._isConnected = true;
-        self._pc.createOffer(function(sessionDescription) {
-            self._isConnected = true;
-            self._setLocalAndSendMessage.call(self, sessionDescription);
-        }, function(err) {
-            self._isConnected = false;
-            console.log("createOffer error", err);
-        }, constraints);
-    }
-};
-
-Peer.prototype.doAnswer = function() {
-    var self = this;
-    var constraints = {};
-    self._pc.createAnswer(function(sessionDescription) {
-        self._setLocalAndSendMessage.call(self, sessionDescription);
-        for (var i = 0; i < self._otherCandidates.length; i++) {
-            if (self._otherCandidates[i]) {
-                console.log("Peer.doAnswer: this_otherCandidates: ", self._otherCandidates[i]);
-                self._pc.addIceCandidate(self._otherCandidates[i]);
-            }
-        }
-    }, function(err) {
-        console.log("createAnswer error", err);
-    }, constraints);
-};
-
-Peer.prototype.setIceCandidates = function(iceCandidate) {
-    //if (!this._otherSDP) {
-    //    this._otherCandidates.push(iceCandidate);
-    //}
-    //if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
-    this._pc.addIceCandidate(iceCandidate);
-    //}
+    } else if (msg.data == "\n") {
+        // End of received message 
+        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
+    } 
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
-    this._pc.setLocalDescription(sessionDescription);
-    this._relay.call(this, sessionDescription);
+    var self = this;
+    self.connection.setLocalDescription(sessionDescription, function() {
+        self._relay.call(self, sessionDescription);
+    }, self._logger.handleError);
 };
 
 Peer.prototype._iceCallback = function(event) {
-    if (event.candidate) {
-        // console.log('Local ICE candidate: \n' + event.candidate.candidate);
-        var data = {
-            type: 'candidate',
-            label: event.candidate.sdpMLineIndex,
-            id: event.candidate.sdpMid,
-            candidate: event.candidate.candidate
-        };
-        this._relay.call(this, data);
-    }
-};
-
-Peer.prototype._handleReceiveChannelStateChange = function() {
-    var readyState = this._receiveChannel.readyState;
-    console.log('Receive channel state is: ' + readyState);
-};
-
-Peer.prototype._createEventHandler = function(name) {
-    return function(evt) {
-        console.log('' + name + ' Event ' + events.length, evt);
+    var data = {
+        type: 'candidate',
+        label: event.candidate.sdpMLineIndex,
+        id: event.candidate.sdpMid,
+        candidate: event.candidate.candidate
     };
+    this._relay.call(this, data);
 };
 
 Peer.prototype._sendImage = function(hash) {
@@ -250,8 +160,8 @@ Peer.prototype._sendImage = function(hash) {
                 }
 
                 // Slow down control
-                if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
-                    console.log("bufferedAmount ist too high! Slow down...");
+                if (self.dataChannel.bufferedAmount > 5 * chunkSize) {
+                    self._logger.trace("bufferedAmount ist too high! Slow down...");
                     setTimeout(sendAllData, 250);
                     return;
                 }
@@ -263,23 +173,27 @@ Peer.prototype._sendImage = function(hash) {
                     hash: hash,
                     data: chunk
                 };
-                self._sendChannel.send(marshal(msg));
+                self.dataChannel.send(marshal(msg));
                 dataSent = slideEndIndex;
 
                 // Create & send end mark
                 if (dataSent + 1 >= downloadSize) {
-                    console.log("All data chunks for " + hash + " have been sent to ", self._id);
+                    self._logger.trace("All data chunks for " + hash + " have been sent to " + self._id);
                     var msg = {
                         type: "fetch-response",
                         hash: hash,
                         data: "\n"
                     };
-                    self._sendChannel.send(JSON.stringify(msg));
+                    self.dataChannel.send(JSON.stringify(msg));
                 }
             }
         };
         sendAllData();
     }
+};
+
+Peer.prototype._relay = function(data) {
+    this._signalChannel.send('relay', data, this._id);
 };
 
 // Helper functions
