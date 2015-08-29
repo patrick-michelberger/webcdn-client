@@ -39,6 +39,7 @@ function Peernet(options) {
     this._signalChannel.on('relay', function(data) {
         self._handleRelayMessage.call(self, data);
     });
+    this._logger = options.logger;
 };
 
 Peernet.prototype.fetch = function(peerid, hash, callback) {
@@ -52,7 +53,7 @@ Peernet.prototype.fetch = function(peerid, hash, callback) {
 Peernet.prototype._send = function(peerId, data, callback) {
     var peer = this._createConnection(peerId, true);
     peer.callbacks[data.hash] = callback;
-    var dataChannel = peer._sendChannel;
+    var dataChannel = peer.dataChannel;
     data = JSON.stringify(data);
     if (typeof(dataChannel) === 'undefined' || dataChannel === null || dataChannel.readyState === 'closing' || dataChannel.readyState === 'closed') {
         // TODO this.reset(peer);
@@ -85,52 +86,33 @@ Peernet.prototype._send = function(peerId, data, callback) {
 Peernet.prototype._createConnection = function(peerId, originator) {
     var self = this;
     if (!this._peers[peerId]) {
-        var options = {
+        // Create new peer
+        this._peers[peerId] = new Peer({
             "id": peerId,
             "originator": originator,
             "signalChannel": this._signalChannel,
             "peernet": this,
+            "logger": this._logger,
             "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
-        };
-        this._peers[peerId] = new Peer(options);
-        this._peers[peerId].on('upload_ratio', function(data) {
-            self._signalChannel.send('upload_ratio', data);
         });
     }
     return this._peers[peerId];
 };
 
-Peernet.prototype._handleRelayMessage = function(data) {
-    var msg = data;
-    var started = true;
+Peernet.prototype._handleRelayMessage = function(msg) {
     var self = this;
-    if (msg && msg.data && msg.data.type === 'offer') {
-        //console.log("offer from: ", msg.from);
-        var peer = this._createConnection(data.from, false);
+    var peer = this._createConnection(msg.from, false);
+    if (msg && msg.data && msg.data.sdp) {
         peer._otherSDP = msg.data;
-        peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        peer.doAnswer();
-    } else if (msg && msg.data && msg.data.type === 'answer' && started) {
-        //console.log("answer from: ", msg.from);
-        var peer = this._createConnection(data.from, false);
-        peer._otherSDP = msg.data;
-        peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        for (var i = 0; i < peer._otherCandidates.length; i++) {
-            if (peer._otherCandidates[i]) {
-                peer._pc.addIceCandidate(peer._otherCandidates[i]);
+        peer.connection.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data), function() {
+            // Answer offer 
+            if (msg.data.type === 'offer') {
+                peer.doAnswer();
             }
-        }
-    } else if (msg && msg.data && msg.data.type === 'candidate' && started) {
-        //console.log("candidate from: ", data.from);
-        var candidate = new self._wrtc.RTCIceCandidate({
-            candidate: msg.data.candidate
         });
-        var peer = this._peers[data.from];
-        peer.setIceCandidates(candidate);
-    } else if (msg && msg.data && msg.data.type === 'bye') {
-        // TODO onRemoteHangup();
-        console.log('Hangup');
+    } else if (msg && msg.data && msg.data.candidate) {
+        peer.setIceCandidates(msg.data.candidate);
     }
 };
 

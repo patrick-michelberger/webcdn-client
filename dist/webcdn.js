@@ -2919,11 +2919,11 @@ var Statistics = require('./statistics.js');
 
 module.exports = Download;
 
-function Download(peerid, hash, size, peernet, callback) {
+function Download(peerid, hash, peernet, logger, callback) {
     this.peerid = peerid;
     this.hash = hash;
-    this.size = size;
     this.peernet = peernet;
+    this.logger = logger;
     this.done = callback;
     this.chunks = [];
 };
@@ -2975,9 +2975,9 @@ Download.prototype._loadImageByCDN = function(hash) {
     req.open('GET', url, true);
     req.responseType = 'arraybuffer';
     req.onerror = function(err) {
-        console.log("XHR Error: ", err);
         element.setAttribute('crossOrigin', 'anonymous');
         element.src = url;
+        self.logger.handleError(err);
     };
     req.onload = function(err) {
         if (this.status == 200) {
@@ -2985,14 +2985,14 @@ Download.prototype._loadImageByCDN = function(hash) {
             self.peernet.finishDownload(self.hash, content, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
-            console.log('XHR returned ' + this.status);
+            self.logger.trace('XHR returned ' + this.status);
         }
     };
 
     req.send();
 };
 
-},{"./statistics.js":19}],15:[function(require,module,exports){
+},{"./statistics.js":20}],15:[function(require,module,exports){
 /**
  * Receive user's current geolocation 
  * @param {getCurrentPositionCallback} callback - The callback that handles the response.
@@ -3058,6 +3058,29 @@ module.exports = function getCurrentPosition(callback) {
  * @param {String} position.longitude - longitude value
  */
 },{}],16:[function(require,module,exports){
+module.exports = Logger;
+
+function Logger(options) {
+    this.DEBUG = options.debug;
+};
+
+Logger.prototype.handleError = function(err) {
+    if (this.DEBUG) {
+        console.log('error: ' + error);
+    }
+};
+
+Logger.prototype.trace = function(message, data) {
+    if (this.DEBUG) {
+        if (data) {
+            console.log(message, data);
+        } else {
+            console.log(message);
+        }
+    }
+};
+
+},{}],17:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 
@@ -3068,9 +3091,10 @@ inherits(Messenger, EventEmitter);
  * Wrapper for setting up and maintaining a websocket connection
  * @constructor 
  */
-function Messenger() {
+function Messenger(options) {
     EventEmitter.call(this);
     this.socket = null;
+    this.logger = options.logger;
 };
 
 /** 
@@ -3081,7 +3105,7 @@ function Messenger() {
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
     if (self.socket) {
-        console.log("Socket exist, init fail.");
+        self.logger.trace("Socket exist, init fail.");
         callback();
         return;
     }
@@ -3089,11 +3113,11 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
     self.socket = new WebSocket(coordinatorUrl);
 
     self.socket.onclose = function(event) {
-        console.log("WebSocket.onclose", event);
+       self.logger.trace("WebSocket.onclose", event);
     };
 
     self.socket.onerror = function(event) {
-        console.log("WebSocket.onerror", event);
+        self.logger.trace("WebSocket.onerror", event);
     };
 
     self.socket.onmessage = function(event) {
@@ -3145,15 +3169,13 @@ Messenger.prototype._handleRelayMessage = function(data) {
 Messenger.prototype._handleLookupResponse = function(data) {
     this.emit('lookup-response:' + data.hash, data);
 };
-},{"events":5,"util":9}],17:[function(require,module,exports){
+},{"events":5,"util":9}],18:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Statistics = require('./statistics.js');
 
 module.exports = Peer;
 inherits(Peer, EventEmitter);
-
-var i = 0;
 
 /**
  * Wrapper for setting up and maintaining peer connection with another peer
@@ -3167,20 +3189,22 @@ var i = 0;
  */
 function Peer(options) {
     EventEmitter.call(this);
+
+    // Properties
+    this.connection = null;
+    this.dataChannel = null;
     this.callbacks = {};
+
     this._id = options.id;
     this._wrtc = options.wrtc;
-    this._hashes = [];
     this._iceUrls = options.iceUrls;
-    this._pc = null;
+    this._originator = options.originator ||  false;
+
+    // Dependencis
     this._signalChannel = options.signalChannel;
+    this._logger = options.logger;
     this._peernet = options.peernet;
-    this._reveiveChannel = null;
-    this._isConnected = false;
-    this._sendChannel = null;
-    this._otherCandidates = [];
-    this._otherSDP = false;
-    this._originator = options.originator;
+
     this.init();
 };
 
@@ -3188,33 +3212,37 @@ function Peer(options) {
  * Creates a RTCPeerConnection and a DataChannel with given peer.
  */
 Peer.prototype.init = function() {
-    this._pc = this._createPeerConnection();
-    this._sendChannel = this._createDataChannel(this._pc, this._id);
+    this.connection = this._createPeerConnection();
+    this.dataChannel = this._createDataChannel(this.connection, this._id);
 };
 
-/**
- * Add resource hash to peer hash array. Indicates peer is storing this given resource.
- * @param {String} hash - unique resource hash value
- */
-Peer.prototype.addHash = function(hash) {
-    if (hash) {
-        this._hashes.push(hash);
-    }
+Peer.prototype.doOffer = function() {
+    var self = this;
+    self.connection.createOffer(function(sessionDescription) {
+        self._setLocalAndSendMessage.call(self, sessionDescription);
+    }, self._logger.handleError);
+};
+
+Peer.prototype.doAnswer = function() {
+    var self = this;
+    self.connection.createAnswer(function(sessionDescription) {
+        self._setLocalAndSendMessage.call(self, sessionDescription);
+    }, self._logger.handleError);
+};
+
+Peer.prototype.setIceCandidates = function(candidate) {
+    var iceCandidate = new this._wrtc.RTCIceCandidate({
+        candidate: candidate
+    });
+    this.connection.addIceCandidate(iceCandidate);
 };
 
 Peer.prototype._createPeerConnection = function() {
     var self = this;
-    var servers = {
+    var pc = new this._wrtc.RTCPeerConnection({
         iceServers: this._iceUrls
-    };
-    var constraints = {};
-    var pc = new this._wrtc.RTCPeerConnection(servers, constraints);
-    var name = "peerConnection_" + this._id;
-    // General event handlers 
-    pc.onconnecting = this._createEventHandler(name + " onconnecting");
-    pc.onopen = this._createEventHandler(name + " onopen");
-    pc.onaddstream = this._createEventHandler(name + " onaddstream");
-    pc.onremovestream = this._createEventHandler(name + " onremovestream");
+    });
+
     // ICE handlers
     pc.onicecandidate = function(event) {
         if (event.candidate && self._originator === true) {
@@ -3226,62 +3254,24 @@ Peer.prototype._createPeerConnection = function() {
             self.doOffer();
         }
     };
+
+    // DateChannel creation handler (other peer)
+    pc.ondatachannel = function(event) {
+        event.channel.onmessage = function(event) {
+            self._handleMessage.call(self, event);
+        };
+    };
     return pc;
 };
 
 Peer.prototype._createDataChannel = function(pc, label) {
     var self = this;
-    var constraints = {
-        ordered: true
-    };
-
-    // Date channel handlers
-    pc.ondatachannel = function(event) {
-        self._gotReceiveChannel.call(self, event);
-    };
-
-    var dc = self._pc.createDataChannel(label, constraints);
-    // Event handlers 
-    dc.onclose = function() {
-        console.log("dataChannel close");
-    };
-    dc.onerror = function(err) {
-        console.log("dc.onerror: ", err);
-    };
+    var dc = self.connection.createDataChannel(label);
     dc.onmessage = function(event) {
         self._handleMessage.call(self, event);
     };
     return dc;
 };
-
-Peer.prototype._fetchObjects = function() {
-    var self = this;
-    self._hashes.forEach(function(hash) {
-        self._fetch(hash);
-    });
-};
-
-Peer.prototype._fetch = function(hash) {
-    var msg = {
-        type: 'fetch',
-        hash: hash
-    };
-    var msg_string = JSON.stringify(msg);
-    // Statistics.mark("fetch_start:" + hash);
-    this._sendChannel.send(msg_string);
-};
-
-Peer.prototype._gotReceiveChannel = function(event) {
-    var self = this;
-    this._receiveChannel = event.channel;
-    this._receiveChannel.onmessage = function(event) {
-        self._handleMessage.call(self, event);
-    };
-    this._receiveChannel.onopen = function() {};
-    this._receiveChannel.onclose = function() {};
-
-};
-
 
 /**
  * Handler for DataChannel messages
@@ -3289,95 +3279,39 @@ Peer.prototype._gotReceiveChannel = function(event) {
  */
 Peer.prototype._handleMessage = function(event) {
     var msg = unmarshal(event.data);
-    var endimage = document.querySelector('[data-webcdn-hash="' + msg.hash + '"]');
-
     if (msg.type === 'fetch' && msg.hash) {
         // Request for resource from other peer
         this._sendImage(msg.hash);
-    } else if (msg.data == "\n") {
-        // End of received message 
-        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
         if (!this._peernet.pending[msg.hash]) {
+            console.log("Adding first chunk...");
             this._peernet.pending[msg.hash] = [msg.data]; // First chunk
         } else {
+            console.log("Adding chunk " + Object.keys(this._peernet.pending).length);
             this._peernet.pending[msg.hash].push(msg.data);
         }
-    }
-};
-
-Peer.prototype._relay = function(data) {
-    this._signalChannel.send('relay', data, this._id);
-};
-
-Peer.prototype.doOffer = function() {
-    var self = this;
-    var constraints = {};
-    if (!self._isConnected) {
-        self._isConnected = true;
-        self._pc.createOffer(function(sessionDescription) {
-            self._isConnected = true;
-            self._setLocalAndSendMessage.call(self, sessionDescription);
-        }, function(err) {
-            self._isConnected = false;
-            console.log("createOffer error", err);
-        }, constraints);
-    }
-};
-
-Peer.prototype.doAnswer = function() {
-    var self = this;
-    var constraints = {};
-    self._pc.createAnswer(function(sessionDescription) {
-        self._setLocalAndSendMessage.call(self, sessionDescription);
-        for (var i = 0; i < self._otherCandidates.length; i++) {
-            if (self._otherCandidates[i]) {
-                console.log("Peer.doAnswer: this_otherCandidates: ", self._otherCandidates[i]);
-                self._pc.addIceCandidate(self._otherCandidates[i]);
-            }
-        }
-    }, function(err) {
-        console.log("createAnswer error", err);
-    }, constraints);
-};
-
-Peer.prototype.setIceCandidates = function(iceCandidate) {
-    //if (!this._otherSDP) {
-    //    this._otherCandidates.push(iceCandidate);
-    //}
-    //if (this._otherSDP && iceCandidate && iceCandidate.candidate && iceCandidate.candidate !== null) {
-    this._pc.addIceCandidate(iceCandidate);
-    //}
+    } else if (msg.data == "\n") {
+        // End of received message 
+        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
+    } 
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
-    this._pc.setLocalDescription(sessionDescription);
-    this._relay.call(this, sessionDescription);
+    var self = this;
+    self.connection.setLocalDescription(sessionDescription, function() {
+        self._relay.call(self, sessionDescription);
+    }, self._logger.handleError);
 };
 
 Peer.prototype._iceCallback = function(event) {
-    if (event.candidate) {
-        // console.log('Local ICE candidate: \n' + event.candidate.candidate);
-        var data = {
-            type: 'candidate',
-            label: event.candidate.sdpMLineIndex,
-            id: event.candidate.sdpMid,
-            candidate: event.candidate.candidate
-        };
-        this._relay.call(this, data);
-    }
-};
-
-Peer.prototype._handleReceiveChannelStateChange = function() {
-    var readyState = this._receiveChannel.readyState;
-    console.log('Receive channel state is: ' + readyState);
-};
-
-Peer.prototype._createEventHandler = function(name) {
-    return function(evt) {
-        console.log('' + name + ' Event ' + events.length, evt);
+    var data = {
+        type: 'candidate',
+        label: event.candidate.sdpMLineIndex,
+        id: event.candidate.sdpMid,
+        candidate: event.candidate.candidate
     };
+    this._relay.call(this, data);
 };
 
 Peer.prototype._sendImage = function(hash) {
@@ -3398,8 +3332,8 @@ Peer.prototype._sendImage = function(hash) {
                 }
 
                 // Slow down control
-                if (self._sendChannel.bufferedAmount > 5 * chunkSize) {
-                    console.log("bufferedAmount ist too high! Slow down...");
+                if (self.dataChannel.bufferedAmount > 5 * chunkSize) {
+                    self._logger.trace("bufferedAmount ist too high! Slow down...");
                     setTimeout(sendAllData, 250);
                     return;
                 }
@@ -3411,23 +3345,27 @@ Peer.prototype._sendImage = function(hash) {
                     hash: hash,
                     data: chunk
                 };
-                self._sendChannel.send(marshal(msg));
+                self.dataChannel.send(marshal(msg));
                 dataSent = slideEndIndex;
 
                 // Create & send end mark
                 if (dataSent + 1 >= downloadSize) {
-                    console.log("All data chunks for " + hash + " have been sent to ", self._id);
+                    self._logger.trace("All data chunks for " + hash + " have been sent to " + self._id);
                     var msg = {
                         type: "fetch-response",
                         hash: hash,
                         data: "\n"
                     };
-                    self._sendChannel.send(JSON.stringify(msg));
+                    self.dataChannel.send(JSON.stringify(msg));
                 }
             }
         };
         sendAllData();
     }
+};
+
+Peer.prototype._relay = function(data) {
+    this._signalChannel.send('relay', data, this._id);
 };
 
 // Helper functions
@@ -3468,7 +3406,7 @@ function unmarshal(data) {
     return message;
 };
 
-},{"./statistics.js":19,"events":5,"util":9}],18:[function(require,module,exports){
+},{"./statistics.js":20,"events":5,"util":9}],19:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
@@ -3510,6 +3448,7 @@ function Peernet(options) {
     this._signalChannel.on('relay', function(data) {
         self._handleRelayMessage.call(self, data);
     });
+    this._logger = options.logger;
 };
 
 Peernet.prototype.fetch = function(peerid, hash, callback) {
@@ -3523,7 +3462,7 @@ Peernet.prototype.fetch = function(peerid, hash, callback) {
 Peernet.prototype._send = function(peerId, data, callback) {
     var peer = this._createConnection(peerId, true);
     peer.callbacks[data.hash] = callback;
-    var dataChannel = peer._sendChannel;
+    var dataChannel = peer.dataChannel;
     data = JSON.stringify(data);
     if (typeof(dataChannel) === 'undefined' || dataChannel === null || dataChannel.readyState === 'closing' || dataChannel.readyState === 'closed') {
         // TODO this.reset(peer);
@@ -3556,52 +3495,33 @@ Peernet.prototype._send = function(peerId, data, callback) {
 Peernet.prototype._createConnection = function(peerId, originator) {
     var self = this;
     if (!this._peers[peerId]) {
-        var options = {
+        // Create new peer
+        this._peers[peerId] = new Peer({
             "id": peerId,
             "originator": originator,
             "signalChannel": this._signalChannel,
             "peernet": this,
+            "logger": this._logger,
             "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
-        };
-        this._peers[peerId] = new Peer(options);
-        this._peers[peerId].on('upload_ratio', function(data) {
-            self._signalChannel.send('upload_ratio', data);
         });
     }
     return this._peers[peerId];
 };
 
-Peernet.prototype._handleRelayMessage = function(data) {
-    var msg = data;
-    var started = true;
+Peernet.prototype._handleRelayMessage = function(msg) {
     var self = this;
-    if (msg && msg.data && msg.data.type === 'offer') {
-        //console.log("offer from: ", msg.from);
-        var peer = this._createConnection(data.from, false);
+    var peer = this._createConnection(msg.from, false);
+    if (msg && msg.data && msg.data.sdp) {
         peer._otherSDP = msg.data;
-        peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        peer.doAnswer();
-    } else if (msg && msg.data && msg.data.type === 'answer' && started) {
-        //console.log("answer from: ", msg.from);
-        var peer = this._createConnection(data.from, false);
-        peer._otherSDP = msg.data;
-        peer._pc.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data));
-        for (var i = 0; i < peer._otherCandidates.length; i++) {
-            if (peer._otherCandidates[i]) {
-                peer._pc.addIceCandidate(peer._otherCandidates[i]);
+        peer.connection.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data), function() {
+            // Answer offer 
+            if (msg.data.type === 'offer') {
+                peer.doAnswer();
             }
-        }
-    } else if (msg && msg.data && msg.data.type === 'candidate' && started) {
-        //console.log("candidate from: ", data.from);
-        var candidate = new self._wrtc.RTCIceCandidate({
-            candidate: msg.data.candidate
         });
-        var peer = this._peers[data.from];
-        peer.setIceCandidates(candidate);
-    } else if (msg && msg.data && msg.data.type === 'bye') {
-        // TODO onRemoteHangup();
-        console.log('Hangup');
+    } else if (msg && msg.data && msg.data.candidate) {
+        peer.setIceCandidates(msg.data.candidate);
     }
 };
 
@@ -3624,7 +3544,7 @@ Peernet.prototype._update = function(hashes) {
     this._signalChannel.send('update', hashes);
 };
 
-},{"./peer.js":17,"events":5,"get-browser-rtc":10,"util":9}],19:[function(require,module,exports){
+},{"./peer.js":18,"events":5,"get-browser-rtc":10,"util":9}],20:[function(require,module,exports){
 var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 
@@ -3756,14 +3676,6 @@ Statistics.measure = function() {
 function createWebsocket()  {
     var ws = new WebSocket(url);
 
-    ws.onclose = function(event) {
-        console.log("WebSocket.onclose", event);
-    };
-
-    ws.onerror = function(event) {
-        console.log("WebSocket.onerror", event);
-    };
-
     ws.onmessage = function(event) {
         var msg = JSON.parse(event.data);
     };
@@ -3778,7 +3690,7 @@ function createWebsocket()  {
 
 module.exports = Statistics;
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 var Statistics = require('./statistics.js');
 
 module.exports = Tracker;
@@ -3797,7 +3709,7 @@ Tracker.prototype.getInfo = function(hash, callback) {
 };
 
 
-},{"./statistics.js":19}],21:[function(require,module,exports){
+},{"./statistics.js":20}],22:[function(require,module,exports){
 /** 
  * Generates a unique user identification
  * @return {String} uuid - unique user identification
@@ -3828,7 +3740,7 @@ var UUID = (function() {
 })();
 
 module.exports = UUID;
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 'use strict';
 
 /**
@@ -3849,6 +3761,7 @@ var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Messenger = require('./lib/messenger.js');
 var Tracker = require('./lib/tracker.js');
+var Logger = require('./lib/logger.js');
 var Download = require('./lib/download.js');
 var Peernet = require('./lib/peernet.js');
 var Statistics = require('./lib/statistics.js');
@@ -3871,18 +3784,26 @@ function WebCDN(config) {
     config = config ||  {};
     this._bucketUrl = config.bucketUrl ||  false;
     this._trackGeolocation = config.trackGeolocation ||  false;
+    this.debug = config.debug || false;
     this.uuid = window.webcdn_uuid;
 
     // Assets & caches
     this._items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]')); // marked resources for WebCDN distribution
 
     // Dependencies
-    this._messenger = new Messenger();
+    this._logger = new Logger({
+        debug: this.debug
+    });
+    this._messenger = new Messenger({
+        logger: this._logger
+    });
     this._tracker = new Tracker({
-        messenger: this._messenger
+        messenger: this._messenger,
+        logger: this._logger
     });
     this._peernet = new Peernet({
-        signalChannel: this._messenger
+        signalChannel: this._messenger,
+        logger: this._logger
     });
 };
 
@@ -3895,6 +3816,7 @@ function WebCDN(config) {
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
     var id = getQueryId(coordinatorUrl);
+    callback = callback || function() {};
 
     if (!id) {
         coordinatorUrl += "?id=" + this.uuid;
@@ -3938,7 +3860,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
 WebCDN.prototype.load = function(hash) {
     var self = this;
     this._tracker.getInfo(hash, function(data) {
-        var download = new Download(data.peerid, data.hash, data.size, self._peernet, function(data, err) {
+        var download = new Download(data.peerid, data.hash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
         download.start();
@@ -4007,7 +3929,7 @@ WebCDN.prototype._sendGeolocation = function() {
  */
 WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var blob;
-    var element = document.querySelector('[data-webcdn-hash="' + hash +'"]');
+    var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
     switch (element.tagName) {
         case 'IMG':
             blob = new Blob([arraybuffer], {
@@ -4067,4 +3989,4 @@ function bucketizeResources(DOMelements, bucketUrl) {
     });
 };
 
-},{"./lib/download.js":14,"./lib/geo.js":15,"./lib/messenger.js":16,"./lib/peernet.js":18,"./lib/statistics.js":19,"./lib/tracker.js":20,"./lib/uuid.js":21,"events":5,"sha1":13,"util":9}]},{},[22]);
+},{"./lib/download.js":14,"./lib/geo.js":15,"./lib/logger.js":16,"./lib/messenger.js":17,"./lib/peernet.js":19,"./lib/statistics.js":20,"./lib/tracker.js":21,"./lib/uuid.js":22,"events":5,"sha1":13,"util":9}]},{},[23]);
