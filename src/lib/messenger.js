@@ -8,9 +8,10 @@ inherits(Messenger, EventEmitter);
  * Wrapper for setting up and maintaining a websocket connection
  * @constructor 
  */
-function Messenger() {
+function Messenger(options) {
     EventEmitter.call(this);
     this.socket = null;
+    this.logger = options.logger;
 };
 
 /** 
@@ -21,7 +22,7 @@ function Messenger() {
 Messenger.prototype.connect = function(coordinatorUrl, callback) {
     var self = this;
     if (self.socket) {
-        console.log("Socket exist, init fail.");
+        self.logger.trace("Socket exist, init fail.");
         callback();
         return;
     }
@@ -29,11 +30,11 @@ Messenger.prototype.connect = function(coordinatorUrl, callback) {
     self.socket = new WebSocket(coordinatorUrl);
 
     self.socket.onclose = function(event) {
-        console.log("WebSocket.onclose", event);
+       self.logger.trace("WebSocket.onclose", event);
     };
 
     self.socket.onerror = function(event) {
-        console.log("WebSocket.onerror", event);
+        self.logger.trace("WebSocket.onerror", event);
     };
 
     self.socket.onmessage = function(event) {

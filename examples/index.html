@@ -29,7 +29,8 @@
 
         var webcdn = new WebCDN({
             "bucketUrl": "https://s3.eu-central-1.amazonaws.com/webcdn2/",
-            "trackGeolocation": true
+            "trackGeolocation": true,
+            "debug": true
         });
 
         // Event listeners
@@ -50,9 +51,7 @@
         });
 
         // webcdn.init('ws://webcdn.michelberger.info:1337', function() {
-        webcdn.init('ws://localhost:1337', function() {
-            console.log("WebCDN READY");
-        });
+        webcdn.init('ws://localhost:1337');
         </script>
 </body>
 

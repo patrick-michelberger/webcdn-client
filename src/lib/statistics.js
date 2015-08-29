@@ -129,14 +129,6 @@ Statistics.measure = function() {
 function createWebsocket()  {
     var ws = new WebSocket(url);
 
-    ws.onclose = function(event) {
-        console.log("WebSocket.onclose", event);
-    };
-
-    ws.onerror = function(event) {
-        console.log("WebSocket.onerror", event);
-    };
-
     ws.onmessage = function(event) {
         var msg = JSON.parse(event.data);
     };

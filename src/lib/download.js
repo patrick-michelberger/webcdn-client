@@ -2,11 +2,11 @@ var Statistics = require('./statistics.js');
 
 module.exports = Download;
 
-function Download(peerid, hash, size, peernet, callback) {
+function Download(peerid, hash, peernet, logger, callback) {
     this.peerid = peerid;
     this.hash = hash;
-    this.size = size;
     this.peernet = peernet;
+    this.logger = logger;
     this.done = callback;
     this.chunks = [];
 };
@@ -58,9 +58,9 @@ Download.prototype._loadImageByCDN = function(hash) {
     req.open('GET', url, true);
     req.responseType = 'arraybuffer';
     req.onerror = function(err) {
-        console.log("XHR Error: ", err);
         element.setAttribute('crossOrigin', 'anonymous');
         element.src = url;
+        self.logger.handleError(err);
     };
     req.onload = function(err) {
         if (this.status == 200) {
@@ -68,7 +68,7 @@ Download.prototype._loadImageByCDN = function(hash) {
             self.peernet.finishDownload(self.hash, content, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
-            console.log('XHR returned ' + this.status);
+            self.logger.trace('XHR returned ' + this.status);
         }
     };
 

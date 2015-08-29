@@ -18,6 +18,7 @@ var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Messenger = require('./lib/messenger.js');
 var Tracker = require('./lib/tracker.js');
+var Logger = require('./lib/logger.js');
 var Download = require('./lib/download.js');
 var Peernet = require('./lib/peernet.js');
 var Statistics = require('./lib/statistics.js');
@@ -40,18 +41,26 @@ function WebCDN(config) {
     config = config ||  {};
     this._bucketUrl = config.bucketUrl ||  false;
     this._trackGeolocation = config.trackGeolocation ||  false;
+    this.debug = config.debug || false;
     this.uuid = window.webcdn_uuid;
 
     // Assets & caches
     this._items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]')); // marked resources for WebCDN distribution
 
     // Dependencies
-    this._messenger = new Messenger();
+    this._logger = new Logger({
+        debug: this.debug
+    });
+    this._messenger = new Messenger({
+        logger: this._logger
+    });
     this._tracker = new Tracker({
-        messenger: this._messenger
+        messenger: this._messenger,
+        logger: this._logger
     });
     this._peernet = new Peernet({
-        signalChannel: this._messenger
+        signalChannel: this._messenger,
+        logger: this._logger
     });
 };
 
@@ -64,6 +73,7 @@ function WebCDN(config) {
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
     var id = getQueryId(coordinatorUrl);
+    callback = callback || function() {};
 
     if (!id) {
         coordinatorUrl += "?id=" + this.uuid;
@@ -107,7 +117,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
 WebCDN.prototype.load = function(hash) {
     var self = this;
     this._tracker.getInfo(hash, function(data) {
-        var download = new Download(data.peerid, data.hash, data.size, self._peernet, function(data, err) {
+        var download = new Download(data.peerid, data.hash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
         download.start();
@@ -176,7 +186,7 @@ WebCDN.prototype._sendGeolocation = function() {
  */
 WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var blob;
-    var element = document.querySelector('[data-webcdn-hash="' + hash +'"]');
+    var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
     switch (element.tagName) {
         case 'IMG':
             blob = new Blob([arraybuffer], {
