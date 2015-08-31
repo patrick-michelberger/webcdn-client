@@ -41,7 +41,7 @@ describe('WebCDN', function() {
             expect(hash).to.equal('783b7477e2fb5b827556947d9a71fae24d699740');
         });
     });
-    
+
     xdescribe('.load', function() {
         xit('should load a resource via WebRTC DataChannel', function(done) {
             var hash = "783b7477e2fb5b827556947d9a71fae24d699740";
@@ -106,7 +106,7 @@ describe('WebCDN', function() {
         });
     });
 
-    describe('._lookup', function() {
+    describe('._tracker.getInfo', function() {
         it('should send a lookup request to the coordinator', function(done) {
             mockServer.on('message', function(data) {
                 var msg = JSON.parse(data);
@@ -115,7 +115,7 @@ describe('WebCDN', function() {
                 done();
             });
             self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn._lookup('123456');
+                self.webcdn._tracker.getInfo('123456');
             });
         });
     });
