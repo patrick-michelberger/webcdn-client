@@ -120,7 +120,7 @@ describe('WebCDN', function() {
         });
     });
 
-    describe('._update', function() {
+    describe('._peernet._update', function() {
         it('should send a update message to the coordinator', function(done) {
 
             mockServer.on('message', function(data) {
@@ -131,7 +131,7 @@ describe('WebCDN', function() {
             });
 
             self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn._update('["123456","125355"]');
+                self.webcdn._peernet._update('["123456","125355"]');
             });
 
         });
