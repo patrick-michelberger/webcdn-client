@@ -65,7 +65,7 @@ Download.prototype._loadImageByCDN = function(hash) {
     req.onload = function(err) {
         if (this.status == 200) {
             var content = this.response;
-            self.peernet.finishDownload(self.hash, content, self.done);
+            self.peernet.finishDownload(self.hash, [content], self.done);
             // Statistics.queryResourceTiming(url);
         } else {
             self.logger.trace('XHR returned ' + this.status);

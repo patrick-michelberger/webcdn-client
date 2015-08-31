@@ -2982,7 +2982,7 @@ Download.prototype._loadImageByCDN = function(hash) {
     req.onload = function(err) {
         if (this.status == 200) {
             var content = this.response;
-            self.peernet.finishDownload(self.hash, content, self.done);
+            self.peernet.finishDownload(self.hash, [content], self.done);
             // Statistics.queryResourceTiming(url);
         } else {
             self.logger.trace('XHR returned ' + this.status);
@@ -3066,7 +3066,7 @@ function Logger(options) {
 
 Logger.prototype.handleError = function(err) {
     if (this.DEBUG) {
-        console.log('error: ' + error);
+        console.log('error: ' + err);
     }
 };
 
@@ -3282,19 +3282,17 @@ Peer.prototype._handleMessage = function(event) {
     if (msg.type === 'fetch' && msg.hash) {
         // Request for resource from other peer
         this._sendImage(msg.hash);
+    } else if (msg.data == "\n") {
+        // End of received message 
+        this.callbacks[msg.hash](this._peernet.pending[msg.hash]);
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
         if (!this._peernet.pending[msg.hash]) {
-            console.log("Adding first chunk...");
             this._peernet.pending[msg.hash] = [msg.data]; // First chunk
         } else {
-            console.log("Adding chunk " + Object.keys(this._peernet.pending).length);
             this._peernet.pending[msg.hash].push(msg.data);
         }
-    } else if (msg.data == "\n") {
-        // End of received message 
-        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
-    } 
+    }
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
@@ -3459,13 +3457,13 @@ Peernet.prototype.fetch = function(peerid, hash, callback) {
     this._send(peerid, data, callback);
 };
 
-Peernet.prototype._send = function(peerId, data, callback) {
-    var peer = this._createConnection(peerId, true);
+Peernet.prototype._send = function(peerid, data, callback) {
+    var peer = this._createConnection(peerid, true);
     peer.callbacks[data.hash] = callback;
     var dataChannel = peer.dataChannel;
     data = JSON.stringify(data);
     if (typeof(dataChannel) === 'undefined' || dataChannel === null || dataChannel.readyState === 'closing' || dataChannel.readyState === 'closed') {
-        // TODO this.reset(peer);
+        this._reset(peerid);
         return;
     }
     if (dataChannel.readyState === 'open') {
@@ -3488,16 +3486,16 @@ Peernet.prototype._send = function(peerId, data, callback) {
 
 /** 
  * Create a peer connection with given peer id for a given resource hash value. 
- * @param {String} peerId - unique peer id  
+ * @param {String} peerid - unique peer id  
  * @param {String} hash - unique resource hash value
  * @return {Peer}
  */
-Peernet.prototype._createConnection = function(peerId, originator) {
+Peernet.prototype._createConnection = function(peerid, originator) {
     var self = this;
-    if (!this._peers[peerId]) {
+    if (!this._peers[peerid]) {
         // Create new peer
-        this._peers[peerId] = new Peer({
-            "id": peerId,
+        this._peers[peerid] = new Peer({
+            "id": peerid,
             "originator": originator,
             "signalChannel": this._signalChannel,
             "peernet": this,
@@ -3506,7 +3504,15 @@ Peernet.prototype._createConnection = function(peerId, originator) {
             "wrtc": this._wrtc
         });
     }
-    return this._peers[peerId];
+    return this._peers[peerid];
+};
+
+Peernet.prototype._reset = function(peerid) {
+    if (this._peers.hasOwnProperty(peerid)) {
+        var peer = this._peers[peerid];
+        peer.connection.close();
+        delete this._peers[peerid];
+    }
 };
 
 Peernet.prototype._handleRelayMessage = function(msg) {
@@ -3927,31 +3933,31 @@ WebCDN.prototype._sendGeolocation = function() {
  * @param {DOMElement} element
  * @param {ArrayBuffer} arrayBuffer
  */
-WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
+WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffers) {
     var blob;
     var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
     switch (element.tagName) {
         case 'IMG':
-            blob = new Blob([arraybuffer], {
+            blob = new Blob(arraybuffers, {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'SCRIPT':
-            blob = new Blob([arraybuffer], {
+            blob = new Blob(arraybuffers, {
                 type: 'text/javascript'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'LINK':
-            blob = new Blob([arraybuffer], {
+            blob = new Blob(arraybuffers, {
                 type: 'text/css'
             });
             element.rel = "stylesheet";
             element.href = window.URL.createObjectURL(blob);
             break;
         default:
-            blob = new Blob([arraybuffer], {
+            blob = new Blob(arraybuffers, {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
