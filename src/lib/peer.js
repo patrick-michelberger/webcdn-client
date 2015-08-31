@@ -110,19 +110,17 @@ Peer.prototype._handleMessage = function(event) {
     if (msg.type === 'fetch' && msg.hash) {
         // Request for resource from other peer
         this._sendImage(msg.hash);
+    } else if (msg.data == "\n") {
+        // End of received message 
+        this.callbacks[msg.hash](this._peernet.pending[msg.hash]);
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
         if (!this._peernet.pending[msg.hash]) {
-            console.log("Adding first chunk...");
             this._peernet.pending[msg.hash] = [msg.data]; // First chunk
         } else {
-            console.log("Adding chunk " + Object.keys(this._peernet.pending).length);
             this._peernet.pending[msg.hash].push(msg.data);
         }
-    } else if (msg.data == "\n") {
-        // End of received message 
-        this.callbacks[msg.hash](this._peernet.pending[msg.hash][0]);
-    } 
+    }
 };
 
 Peer.prototype._setLocalAndSendMessage = function(sessionDescription) {
