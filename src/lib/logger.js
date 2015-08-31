@@ -6,7 +6,7 @@ function Logger(options) {
 
 Logger.prototype.handleError = function(err) {
     if (this.DEBUG) {
-        console.log('error: ' + error);
+        console.log('error: ' + err);
     }
 };
 
