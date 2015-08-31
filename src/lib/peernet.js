@@ -50,13 +50,13 @@ Peernet.prototype.fetch = function(peerid, hash, callback) {
     this._send(peerid, data, callback);
 };
 
-Peernet.prototype._send = function(peerId, data, callback) {
-    var peer = this._createConnection(peerId, true);
+Peernet.prototype._send = function(peerid, data, callback) {
+    var peer = this._createConnection(peerid, true);
     peer.callbacks[data.hash] = callback;
     var dataChannel = peer.dataChannel;
     data = JSON.stringify(data);
     if (typeof(dataChannel) === 'undefined' || dataChannel === null || dataChannel.readyState === 'closing' || dataChannel.readyState === 'closed') {
-        // TODO this.reset(peer);
+        this._reset(peerid);
         return;
     }
     if (dataChannel.readyState === 'open') {
@@ -79,16 +79,16 @@ Peernet.prototype._send = function(peerId, data, callback) {
 
 /** 
  * Create a peer connection with given peer id for a given resource hash value. 
- * @param {String} peerId - unique peer id  
+ * @param {String} peerid - unique peer id  
  * @param {String} hash - unique resource hash value
  * @return {Peer}
  */
-Peernet.prototype._createConnection = function(peerId, originator) {
+Peernet.prototype._createConnection = function(peerid, originator) {
     var self = this;
-    if (!this._peers[peerId]) {
+    if (!this._peers[peerid]) {
         // Create new peer
-        this._peers[peerId] = new Peer({
-            "id": peerId,
+        this._peers[peerid] = new Peer({
+            "id": peerid,
             "originator": originator,
             "signalChannel": this._signalChannel,
             "peernet": this,
@@ -97,7 +97,15 @@ Peernet.prototype._createConnection = function(peerId, originator) {
             "wrtc": this._wrtc
         });
     }
-    return this._peers[peerId];
+    return this._peers[peerid];
+};
+
+Peernet.prototype._reset = function(peerid) {
+    if (this._peers.hasOwnProperty(peerid)) {
+        var peer = this._peers[peerid];
+        peer.connection.close();
+        delete this._peers[peerid];
+    }
 };
 
 Peernet.prototype._handleRelayMessage = function(msg) {
