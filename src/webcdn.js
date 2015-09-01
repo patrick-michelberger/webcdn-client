@@ -184,31 +184,31 @@ WebCDN.prototype._sendGeolocation = function() {
  * @param {DOMElement} element
  * @param {ArrayBuffer} arrayBuffer
  */
-WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffers) {
+WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var blob;
     var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
     switch (element.tagName) {
         case 'IMG':
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffer], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'SCRIPT':
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffer], {
                 type: 'text/javascript'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'LINK':
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffer], {
                 type: 'text/css'
             });
             element.rel = "stylesheet";
             element.href = window.URL.createObjectURL(blob);
             break;
         default:
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffers], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);

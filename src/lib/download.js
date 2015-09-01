@@ -15,8 +15,8 @@ Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
         // Statistics.mark("pc_connect_start:" + this.peerid);
-        var peer = this.peernet.fetch(this.peerid, this.hash, function(chunks)  {
-            self.finish(chunks);
+        var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
+            self.finish(arraybuffer);
         });
     } else {
         // CDN Fallback
@@ -24,7 +24,7 @@ Download.prototype.start = function() {
     }
 };
 
-Download.prototype.finish = function(data) {
+Download.prototype.finish = function(arraybuffer) {
     /* TODO
        endimage.classList.add('webcdn-loaded');
        this.emit('upload_ratio', {
@@ -41,7 +41,7 @@ Download.prototype.finish = function(data) {
        }
        i++;
     */
-    this.peernet.finishDownload(this.hash, data, this.done);
+    this.peernet.finishDownload(this.hash, arraybuffer, this.done);
 };
 
 /**
@@ -65,8 +65,8 @@ Download.prototype._loadImageByCDN = function(hash) {
     req.onload = function(err) {
         window.URL.revokeObjectURL(this.src);
         if (this.status == 200) {
-            var content = this.response;
-            self.peernet.finishDownload(self.hash, [content], self.done);
+            var arraybuffer = this.response;
+            self.peernet.finishDownload(self.hash, arraybuffer, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
             self.logger.trace('XHR returned ' + this.status);

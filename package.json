@@ -37,6 +37,7 @@
     "wrtc": "0.0.56"
   },
   "dependencies": {
+    "array-buffer-concat": "^1.0.1",
     "get-browser-rtc": "^1.0.0",
     "sha1": "^1.1.1"
   }

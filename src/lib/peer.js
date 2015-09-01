@@ -1,5 +1,6 @@
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+var bufferConcat = require('array-buffer-concat');
 var Statistics = require('./statistics.js');
 
 module.exports = Peer;
@@ -116,9 +117,9 @@ Peer.prototype._handleMessage = function(event) {
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
         if (!this._peernet.pending[msg.hash]) {
-            this._peernet.pending[msg.hash] = [msg.data]; // First chunk
+            this._peernet.pending[msg.hash] = msg.data; // First chunk
         } else {
-            this._peernet.pending[msg.hash].push(msg.data);
+            this._peernet.pending[msg.hash] = bufferConcat(this._peernet.pending[msg.hash], msg.data);
         }
     }
 };
