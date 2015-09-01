@@ -1,4 +1,28 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+module.exports = arrayBufferConcat
+
+function arrayBufferConcat () {
+  var length = 0
+  var buffer = null
+
+  for (var i in arguments) {
+    buffer = arguments[i]
+    length += buffer.byteLength
+  }
+
+  var joined = new Uint8Array(length)
+  var offset = 0
+
+  for (var i in arguments) {
+    buffer = arguments[i]
+    joined.set(new Uint8Array(buffer), offset)
+    offset += buffer.byteLength
+  }
+
+  return joined.buffer
+}
+
+},{}],2:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -1414,7 +1438,7 @@ function decodeUtf8Char (str) {
   }
 }
 
-},{"base64-js":2,"ieee754":3,"is-array":4}],2:[function(require,module,exports){
+},{"base64-js":3,"ieee754":4,"is-array":5}],3:[function(require,module,exports){
 var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 ;(function (exports) {
@@ -1540,7 +1564,7 @@ var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 	exports.fromByteArray = uint8ToBase64
 }(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -1626,7 +1650,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 
 /**
  * isArray
@@ -1661,7 +1685,7 @@ module.exports = isArray || function (val) {
   return !! val && '[object Array]' == str.call(val);
 };
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -1964,7 +1988,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -1989,7 +2013,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -2081,14 +2105,14 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -2678,7 +2702,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":8,"_process":7,"inherits":6}],10:[function(require,module,exports){
+},{"./support/isBuffer":9,"_process":8,"inherits":7}],11:[function(require,module,exports){
 // originally pulled out of simple-peer
 
 module.exports = function getBrowserRTC () {
@@ -2695,7 +2719,7 @@ module.exports = function getBrowserRTC () {
   return wrtc
 }
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 var charenc = {
   // UTF-8 encoding
   utf8: {
@@ -2730,7 +2754,7 @@ var charenc = {
 
 module.exports = charenc;
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 (function() {
   var base64map
       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
@@ -2828,7 +2852,7 @@ module.exports = charenc;
   module.exports = crypt;
 })();
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 (function (Buffer){
 (function() {
   var crypt = require('crypt'),
@@ -2914,7 +2938,7 @@ module.exports = charenc;
 })();
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":1,"charenc":11,"crypt":12}],14:[function(require,module,exports){
+},{"buffer":2,"charenc":12,"crypt":13}],15:[function(require,module,exports){
 var Statistics = require('./statistics.js');
 
 module.exports = Download;
@@ -2932,8 +2956,8 @@ Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
         // Statistics.mark("pc_connect_start:" + this.peerid);
-        var peer = this.peernet.fetch(this.peerid, this.hash, function(chunks)  {
-            self.finish(chunks);
+        var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
+            self.finish(arraybuffer);
         });
     } else {
         // CDN Fallback
@@ -2941,7 +2965,7 @@ Download.prototype.start = function() {
     }
 };
 
-Download.prototype.finish = function(data) {
+Download.prototype.finish = function(arraybuffer) {
     /* TODO
        endimage.classList.add('webcdn-loaded');
        this.emit('upload_ratio', {
@@ -2958,7 +2982,7 @@ Download.prototype.finish = function(data) {
        }
        i++;
     */
-    this.peernet.finishDownload(this.hash, data, this.done);
+    this.peernet.finishDownload(this.hash, arraybuffer, this.done);
 };
 
 /**
@@ -2980,9 +3004,10 @@ Download.prototype._loadImageByCDN = function(hash) {
         self.logger.handleError(err);
     };
     req.onload = function(err) {
+        window.URL.revokeObjectURL(this.src);
         if (this.status == 200) {
-            var content = this.response;
-            self.peernet.finishDownload(self.hash, [content], self.done);
+            var arraybuffer = this.response;
+            self.peernet.finishDownload(self.hash, arraybuffer, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
             self.logger.trace('XHR returned ' + this.status);
@@ -2991,8 +3016,7 @@ Download.prototype._loadImageByCDN = function(hash) {
 
     req.send();
 };
-
-},{"./statistics.js":20}],15:[function(require,module,exports){
+},{"./statistics.js":21}],16:[function(require,module,exports){
 /**
  * Receive user's current geolocation 
  * @param {getCurrentPositionCallback} callback - The callback that handles the response.
@@ -3057,7 +3081,7 @@ module.exports = function getCurrentPosition(callback) {
  * @param {String} position.latitude - latitude value
  * @param {String} position.longitude - longitude value
  */
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 module.exports = Logger;
 
 function Logger(options) {
@@ -3080,7 +3104,7 @@ Logger.prototype.trace = function(message, data) {
     }
 };
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 
@@ -3169,9 +3193,10 @@ Messenger.prototype._handleRelayMessage = function(data) {
 Messenger.prototype._handleLookupResponse = function(data) {
     this.emit('lookup-response:' + data.hash, data);
 };
-},{"events":5,"util":9}],18:[function(require,module,exports){
+},{"events":6,"util":10}],19:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
+var bufferConcat = require('array-buffer-concat');
 var Statistics = require('./statistics.js');
 
 module.exports = Peer;
@@ -3288,9 +3313,9 @@ Peer.prototype._handleMessage = function(event) {
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
         if (!this._peernet.pending[msg.hash]) {
-            this._peernet.pending[msg.hash] = [msg.data]; // First chunk
+            this._peernet.pending[msg.hash] = msg.data; // First chunk
         } else {
-            this._peernet.pending[msg.hash].push(msg.data);
+            this._peernet.pending[msg.hash] = bufferConcat(this._peernet.pending[msg.hash], msg.data);
         }
     }
 };
@@ -3404,7 +3429,7 @@ function unmarshal(data) {
     return message;
 };
 
-},{"./statistics.js":20,"events":5,"util":9}],19:[function(require,module,exports){
+},{"./statistics.js":21,"array-buffer-concat":1,"events":6,"util":10}],20:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
@@ -3550,7 +3575,7 @@ Peernet.prototype._update = function(hashes) {
     this._signalChannel.send('update', hashes);
 };
 
-},{"./peer.js":18,"events":5,"get-browser-rtc":10,"util":9}],20:[function(require,module,exports){
+},{"./peer.js":19,"events":6,"get-browser-rtc":11,"util":10}],21:[function(require,module,exports){
 var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 
@@ -3696,7 +3721,7 @@ function createWebsocket()  {
 
 module.exports = Statistics;
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 var Statistics = require('./statistics.js');
 
 module.exports = Tracker;
@@ -3715,7 +3740,7 @@ Tracker.prototype.getInfo = function(hash, callback) {
 };
 
 
-},{"./statistics.js":20}],22:[function(require,module,exports){
+},{"./statistics.js":21}],23:[function(require,module,exports){
 /** 
  * Generates a unique user identification
  * @return {String} uuid - unique user identification
@@ -3746,7 +3771,7 @@ var UUID = (function() {
 })();
 
 module.exports = UUID;
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 'use strict';
 
 /**
@@ -3933,31 +3958,31 @@ WebCDN.prototype._sendGeolocation = function() {
  * @param {DOMElement} element
  * @param {ArrayBuffer} arrayBuffer
  */
-WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffers) {
+WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var blob;
     var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
     switch (element.tagName) {
         case 'IMG':
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffer], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'SCRIPT':
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffer], {
                 type: 'text/javascript'
             });
             element.src = window.URL.createObjectURL(blob);
             break;
         case 'LINK':
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffer], {
                 type: 'text/css'
             });
             element.rel = "stylesheet";
             element.href = window.URL.createObjectURL(blob);
             break;
         default:
-            blob = new Blob(arraybuffers, {
+            blob = new Blob([arraybuffers], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
@@ -3995,4 +4020,4 @@ function bucketizeResources(DOMelements, bucketUrl) {
     });
 };
 
-},{"./lib/download.js":14,"./lib/geo.js":15,"./lib/logger.js":16,"./lib/messenger.js":17,"./lib/peernet.js":19,"./lib/statistics.js":20,"./lib/tracker.js":21,"./lib/uuid.js":22,"events":5,"sha1":13,"util":9}]},{},[23]);
+},{"./lib/download.js":15,"./lib/geo.js":16,"./lib/logger.js":17,"./lib/messenger.js":18,"./lib/peernet.js":20,"./lib/statistics.js":21,"./lib/tracker.js":22,"./lib/uuid.js":23,"events":6,"sha1":14,"util":10}]},{},[24]);
