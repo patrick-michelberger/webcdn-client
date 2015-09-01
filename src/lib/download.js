@@ -63,6 +63,7 @@ Download.prototype._loadImageByCDN = function(hash) {
         self.logger.handleError(err);
     };
     req.onload = function(err) {
+        window.URL.revokeObjectURL(this.src);
         if (this.status == 200) {
             var content = this.response;
             self.peernet.finishDownload(self.hash, [content], self.done);
