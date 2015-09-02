@@ -26,10 +26,11 @@ describe('WebCDN', function() {
 
     describe('.initHashing', function() {
         it('should hash each marked P2P object', function() {
-            self.webcdn._initHashing();
-            var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
-            items.forEach(function(item) {
-                expect(item.dataset.webcdnHash).not.to.be.empty;
+            self.webcdn._initHashing(function(errors) {
+                var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
+                items.forEach(function(item) {
+                    expect(item.dataset.webcdnHash).not.to.be.empty;
+                });
             });
         });
     });
@@ -99,8 +100,9 @@ describe('WebCDN', function() {
                 }
             });
             self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn._initHashing();
-                self.webcdn._initLookup();
+                self.webcdn._initHashing(function() {
+                    self.webcdn._initLookup();
+                });
             });
 
         });
@@ -120,7 +122,7 @@ describe('WebCDN', function() {
         });
     });
 
-    describe('._peernet._update', function() {
+    describe('._update', function() {
         it('should send a update message to the coordinator', function(done) {
 
             mockServer.on('message', function(data) {
@@ -131,7 +133,7 @@ describe('WebCDN', function() {
             });
 
             self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn._peernet._update('["123456","125355"]');
+                self.webcdn._update('["123456","125355"]');
             });
 
         });

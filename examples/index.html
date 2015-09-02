@@ -18,7 +18,7 @@
             </div>
             <div class="col-xs-12 col-sm-4">
                 <!--<img id="webcdn-image-2" data-webcdn-fallback="https://secure-i1.ztat.net/camp/68/ae/b05db993d41d33bb22401f68a0c0.jpg" class="img-responsive" />-->
-                <img data-webcdn-fallback="images/minion-2.png" class="img-responsive" />
+                <img data-webcdn-fallback="images/minion-2.png" data-webcdn-hash="6cbb83ffb254d06b99decb2fbfe75cfc39e79982" class="img-responsive" />
             </div>
             <div class="col-xs-12 col-sm-4">
                 <!--<img id="webcdn-image-3" data-webcdn-fallback="http://cdn.edited.de/file/05bf3dfc9f9f99d64f2c6040d29f3dc6?width=350&height=443" class="img-responsive" />-->
@@ -33,7 +33,8 @@
         var webcdn = new WebCDN({
             //"bucketUrl": "https://s3.eu-central-1.amazonaws.com/webcdn2/",
             "trackGeolocation": true,
-            "debug": true
+            "debug": true,
+            "integrity": false
         });
 
         // Event listeners
@@ -54,7 +55,13 @@
         });
 
         // webcdn.init('ws://webcdn.michelberger.info:1337', function() {
-        webcdn.init('ws://localhost:1337');
+        webcdn.init('ws://localhost:1337', function(errors) {
+            if (errors && errors.length > 0) {
+                errors.forEach(function(err) {
+                    console.log(err);
+                });
+            }
+        });
         </script>
 </body>
 

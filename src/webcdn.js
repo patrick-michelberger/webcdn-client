@@ -41,7 +41,8 @@ function WebCDN(config) {
     config = config ||  {};
     this._bucketUrl = config.bucketUrl ||  false;
     this._trackGeolocation = config.trackGeolocation ||  false;
-    this.debug = config.debug || false;
+    this.DEBUG = config.debug || false;
+    this.INTEGRITY_IS_ACTIVE = config.integrity || false;
     this.uuid = window.webcdn_uuid;
 
     // Assets & caches
@@ -49,7 +50,7 @@ function WebCDN(config) {
 
     // Dependencies
     this._logger = new Logger({
-        debug: this.debug
+        debug: this.DEBUG
     });
     this._messenger = new Messenger({
         logger: this._logger
@@ -102,9 +103,10 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
 
     function connect(callback) {
         self._connect(coordinatorUrl, function() {
-            self._initHashing();
-            self._initLookup();
-            callback();
+            self._initHashing(function(err) {
+                self._initLookup();
+                callback(err);
+            });
         });
     };
 };
@@ -117,7 +119,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
 WebCDN.prototype.load = function(hash) {
     var self = this;
     this._tracker.getInfo(hash, function(data) {
-        var download = new Download(data.peerid, data.hash, self._peernet, self._logger, function(data, err) {
+        var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
         download.start();
@@ -140,10 +142,19 @@ WebCDN.prototype._connect = function(url, callback) {
  * Computes an unique hash value for each resource marked with a data-webcdn-callback attribute 
  * @private
  */
-WebCDN.prototype._initHashing = function() {
+WebCDN.prototype._initHashing = function(callback) {
+    var errors = [];
     this._items.forEach(function(item) {
-        item.dataset.webcdnHash = this._getItemHash(item);
+        if (!item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+            errors.push(new Error("Missing webcdn hash for item " + item.dataset.webcdnFallback));
+        } else if (item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+            // use precomputed hash for content identification and data integrity 
+            item.dataset.webcdnContentHash = item.dataset.webcdnHash;
+        } else {
+            item.dataset.webcdnHash = this._getItemHash(item);
+        }
     }, this);
+    callback(errors);
 };
 
 /**
@@ -162,7 +173,9 @@ WebCDN.prototype._getItemHash = function(item) {
  */
 WebCDN.prototype._initLookup = function() {
     this._items.forEach(function(item) {
-        this.load(item.dataset.webcdnHash);
+        if (item.dataset.hasOwnProperty("webcdnHash")) {
+            this.load(item.dataset.webcdnHash);
+        }
     }, this);
 };
 
@@ -212,7 +225,23 @@ WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
-    }
+    };
+
+    // Update coordinator
+    this._update([{
+        hash: hash,
+        size: arraybuffer.byteLength,
+        contentHash: element.dataset.webcdnContentHash
+    }]);
+};
+
+/**
+ * Send a "update" message to inform the coordinator about stored items
+ * @param {Array} hashes Content hashes computed by _getItemHash()
+ * @private
+ */
+WebCDN.prototype._update = function(hashes) {
+    this._messenger.send('update', hashes);
 };
 
 /**
