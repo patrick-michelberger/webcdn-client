@@ -2,6 +2,7 @@ var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var bufferConcat = require('array-buffer-concat');
 var Statistics = require('./statistics.js');
+var Utils = require('./utils.js');
 
 module.exports = Peer;
 inherits(Peer, EventEmitter);
@@ -107,12 +108,13 @@ Peer.prototype._createDataChannel = function(pc, label) {
  * @function _handleMessage
  */
 Peer.prototype._handleMessage = function(event) {
-    var msg = unmarshal(event.data);
+    var msg = Utils.unmarshal(event.data);
     if (msg.type === 'fetch' && msg.hash) {
         // Request for resource from other peer
         this._sendImage(msg.hash);
     } else if (msg.data == "\n") {
         // End of received message 
+        this._updateUploadRatio(msg.hash, this._peernet.pending[msg.hash].byteLength);
         this.callbacks[msg.hash](this._peernet.pending[msg.hash]);
     } else if (msg.type === 'fetch-response') {
         // Response for resource request
@@ -172,7 +174,7 @@ Peer.prototype._sendImage = function(hash) {
                     hash: hash,
                     data: chunk
                 };
-                self.dataChannel.send(marshal(msg));
+                self.dataChannel.send(Utils.marshal(msg));
                 dataSent = slideEndIndex;
 
                 // Create & send end mark
@@ -195,39 +197,11 @@ Peer.prototype._relay = function(data) {
     this._signalChannel.send('relay', data, this._id);
 };
 
-// Helper functions
-function marshalBuffer(buffer) {
-    var str = "";
-    var bytes = new Uint8Array(buffer);
-    var len = bytes.byteLength;
-    for (var i = 0; i < len; i++) {
-        str += String.fromCharCode(bytes[i]);
-    }
-    return str;
-};
-
-function unmarshalBuffer(str) {
-    var len = str.length;
-    var bytes = new Uint8Array(len);
-    for (var i = 0; i < len; i++) {
-        bytes[i] = str.charCodeAt(i);
-    }
-    return bytes.buffer;
-};
-
-function marshal(message) {
-    if (message.data instanceof ArrayBuffer) {
-        message.data = marshalBuffer(message.data);
-    }
-    return JSON.stringify(message);
-};
-
-function unmarshal(data) {
-    var message = JSON.parse(data);
-    if (message.hasOwnProperty('data')) {
-        if (message.data !== "\n") {
-            message.data = unmarshalBuffer(message.data);
-        }
-    }
-    return message;
+Peer.prototype._updateUploadRatio = function(hash, bytes)  {
+    this._signalChannel.send('upload_ratio', {
+        "from": window.webcdn_uuid,
+        "to": this._id,
+        "hash": hash,
+        "size": bytes
+    });
 };

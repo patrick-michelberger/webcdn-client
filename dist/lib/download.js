@@ -27,29 +27,12 @@ Download.prototype.start = function() {
 };
 
 Download.prototype.finish = function(arraybuffer) {
-    /* TODO
-       endimage.classList.add('webcdn-loaded');
-       this.emit('upload_ratio', {
-           "from": this._id,
-           "to": event.target.label,
-           "hash": msg.hash,
-           "size": base64_byte
-       });
-       this._signalChannel.send('upload_ratio', data);
-       // Measurement code
-       Statistics.mark("fetch_end:" + msg.hash);
-       if (i == 2) {
-           Statistics.measure();
-       }
-       i++;
-    */
-
-    // TODO 
-    var hash = this._createContentHash(new Uint8Array(arraybuffer));
-    if (hash !== this.contentHash) {
-        console.log("CONTENT HASH IS NOT VALID");
+    Statistics.mark("fetch_end:" + this.hash);
+    
+    // Data integrity check
+    if (this._createContentHash(arraybuffer) !== this.contentHash) {
+        this._loadImageByCDN(this.hash);
     } else {
-        console.log("CONTENT HASH IS VALID!!!!");
         this.peernet.finishDownload(this.hash, arraybuffer, this.done);
     }
 };
@@ -64,32 +47,40 @@ Download.prototype._loadImageByCDN = function(hash) {
     var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
     var url = element.dataset.webcdnFallback;
 
-    var req = new XMLHttpRequest();
-    req.open('GET', url, true);
-    req.responseType = 'arraybuffer';
-    req.onerror = function(err) {
-        element.setAttribute('crossOrigin', 'anonymous');
-        element.src = url;
-        self.logger.handleError(err);
-    };
-    req.onload = function(err) {
-        window.URL.revokeObjectURL(this.src);
-        if (this.status == 200) {
-            var arraybuffer = this.response;
-            if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
-                // Create missing content hash
-                element.dataset.webcdnContentHash = self._createContentHash(new Uint8Array(arraybuffer));
+    if (url) {
+        var req = new XMLHttpRequest();
+        req.open('GET', url, true);
+        req.responseType = 'arraybuffer';
+        req.onerror = function(err) {
+            element.setAttribute('crossOrigin', 'anonymous');
+            element.src = url;
+            self.logger.handleError(err);
+        };
+        req.onload = function(err) {
+            window.URL.revokeObjectURL(this.src);
+            if (this.status == 200) {
+                var arraybuffer = this.response;
+                if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
+                    // Create missing content hash
+                    element.dataset.webcdnContentHash = self._createContentHash(arraybuffer);
+                }
+                self.peernet.finishDownload(self.hash, arraybuffer, self.done);
+                // Statistics.queryResourceTiming(url);
+            } else {
+                self.logger.trace('XHR returned ' + this.status);
             }
-            self.peernet.finishDownload(self.hash, arraybuffer, self.done);
-            // Statistics.queryResourceTiming(url);
-        } else {
-            self.logger.trace('XHR returned ' + this.status);
-        }
-    };
-
-    req.send();
+        };
+        req.send();
+    } else {
+        self.logger.trace("No WebCDN fallback URL available");
+    }
 };
 
+/**
+ * Returns a SHA-1 hash value from a given array buffer
+ * @param {ArrayBuffer} content
+ * @return {String} hash
+ */
 Download.prototype._createContentHash = function(content) {
-    return sha1(content);
+    return sha1(new Uint8Array(content));
 };
