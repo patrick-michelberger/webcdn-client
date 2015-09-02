@@ -1,10 +1,12 @@
 var Statistics = require('./statistics.js');
+var sha1 = require('sha1');
 
 module.exports = Download;
 
-function Download(peerid, hash, peernet, logger, callback) {
+function Download(peerid, hash, contentHash, peernet, logger, callback) {
     this.peerid = peerid;
     this.hash = hash;
+    this.contentHash = contentHash;
     this.peernet = peernet;
     this.logger = logger;
     this.done = callback;
@@ -41,7 +43,15 @@ Download.prototype.finish = function(arraybuffer) {
        }
        i++;
     */
-    this.peernet.finishDownload(this.hash, arraybuffer, this.done);
+
+    // TODO 
+    var hash = this._createContentHash(new Uint8Array(arraybuffer));
+    if (hash !== this.contentHash) {
+        console.log("CONTENT HASH IS NOT VALID");
+    } else {
+        console.log("CONTENT HASH IS VALID!!!!");
+        this.peernet.finishDownload(this.hash, arraybuffer, this.done);
+    }
 };
 
 /**
@@ -66,6 +76,10 @@ Download.prototype._loadImageByCDN = function(hash) {
         window.URL.revokeObjectURL(this.src);
         if (this.status == 200) {
             var arraybuffer = this.response;
+            if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
+                // Create missing content hash
+                element.dataset.webcdnContentHash = self._createContentHash(new Uint8Array(arraybuffer));
+            }
             self.peernet.finishDownload(self.hash, arraybuffer, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
@@ -74,4 +88,8 @@ Download.prototype._loadImageByCDN = function(hash) {
     };
 
     req.send();
+};
+
+Download.prototype._createContentHash = function(content) {
+    return sha1(content);
 };

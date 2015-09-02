@@ -197,21 +197,20 @@ Peer.prototype._relay = function(data) {
 
 // Helper functions
 function marshalBuffer(buffer) {
-    var binary = '';
+    var str = "";
     var bytes = new Uint8Array(buffer);
     var len = bytes.byteLength;
     for (var i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+        str += String.fromCharCode(bytes[i]);
     }
-    return window.btoa(binary);
+    return str;
 };
 
-function unmarshalBuffer(base64) {
-    var binaryString = window.atob(base64);
-    var len = binaryString.length;
+function unmarshalBuffer(str) {
+    var len = str.length;
     var bytes = new Uint8Array(len);
     for (var i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+        bytes[i] = str.charCodeAt(i);
     }
     return bytes.buffer;
 };

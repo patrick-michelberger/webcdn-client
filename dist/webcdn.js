@@ -2940,12 +2940,14 @@ module.exports = charenc;
 }).call(this,require("buffer").Buffer)
 },{"buffer":2,"charenc":12,"crypt":13}],15:[function(require,module,exports){
 var Statistics = require('./statistics.js');
+var sha1 = require('sha1');
 
 module.exports = Download;
 
-function Download(peerid, hash, peernet, logger, callback) {
+function Download(peerid, hash, contentHash, peernet, logger, callback) {
     this.peerid = peerid;
     this.hash = hash;
+    this.contentHash = contentHash;
     this.peernet = peernet;
     this.logger = logger;
     this.done = callback;
@@ -2982,7 +2984,15 @@ Download.prototype.finish = function(arraybuffer) {
        }
        i++;
     */
-    this.peernet.finishDownload(this.hash, arraybuffer, this.done);
+
+    // TODO 
+    var hash = this._createContentHash(new Uint8Array(arraybuffer));
+    if (hash !== this.contentHash) {
+        console.log("CONTENT HASH IS NOT VALID");
+    } else {
+        console.log("CONTENT HASH IS VALID!!!!");
+        this.peernet.finishDownload(this.hash, arraybuffer, this.done);
+    }
 };
 
 /**
@@ -3007,6 +3017,10 @@ Download.prototype._loadImageByCDN = function(hash) {
         window.URL.revokeObjectURL(this.src);
         if (this.status == 200) {
             var arraybuffer = this.response;
+            if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
+                // Create missing content hash
+                element.dataset.webcdnContentHash = self._createContentHash(new Uint8Array(arraybuffer));
+            }
             self.peernet.finishDownload(self.hash, arraybuffer, self.done);
             // Statistics.queryResourceTiming(url);
         } else {
@@ -3016,7 +3030,12 @@ Download.prototype._loadImageByCDN = function(hash) {
 
     req.send();
 };
-},{"./statistics.js":21}],16:[function(require,module,exports){
+
+Download.prototype._createContentHash = function(content) {
+    return sha1(content);
+};
+
+},{"./statistics.js":21,"sha1":14}],16:[function(require,module,exports){
 /**
  * Receive user's current geolocation 
  * @param {getCurrentPositionCallback} callback - The callback that handles the response.
@@ -3393,21 +3412,20 @@ Peer.prototype._relay = function(data) {
 
 // Helper functions
 function marshalBuffer(buffer) {
-    var binary = '';
+    var str = "";
     var bytes = new Uint8Array(buffer);
     var len = bytes.byteLength;
     for (var i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+        str += String.fromCharCode(bytes[i]);
     }
-    return window.btoa(binary);
+    return str;
 };
 
-function unmarshalBuffer(base64) {
-    var binaryString = window.atob(base64);
-    var len = binaryString.length;
+function unmarshalBuffer(str) {
+    var len = str.length;
     var bytes = new Uint8Array(len);
     for (var i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+        bytes[i] = str.charCodeAt(i);
     }
     return bytes.buffer;
 };
@@ -3559,20 +3577,7 @@ Peernet.prototype._handleRelayMessage = function(msg) {
 Peernet.prototype.finishDownload = function(hash, content, callback) {
     this.downloaded[hash] = content;
     delete this.pending[hash];
-    this._update([{
-        hash: hash,
-        size: content.byteLength
-    }]);
     callback(this.downloaded[hash]);
-};
-
-/**
- * Send a "update" message to inform the coordinator about stored items
- * @param {Array} hashes Content hashes computed by _getItemHash()
- * @private
- */
-Peernet.prototype._update = function(hashes) {
-    this._signalChannel.send('update', hashes);
 };
 
 },{"./peer.js":19,"events":6,"get-browser-rtc":11,"util":10}],21:[function(require,module,exports){
@@ -3815,7 +3820,8 @@ function WebCDN(config) {
     config = config ||  {};
     this._bucketUrl = config.bucketUrl ||  false;
     this._trackGeolocation = config.trackGeolocation ||  false;
-    this.debug = config.debug || false;
+    this.DEBUG = config.debug || false;
+    this.INTEGRITY_IS_ACTIVE = config.integrity || false;
     this.uuid = window.webcdn_uuid;
 
     // Assets & caches
@@ -3823,7 +3829,7 @@ function WebCDN(config) {
 
     // Dependencies
     this._logger = new Logger({
-        debug: this.debug
+        debug: this.DEBUG
     });
     this._messenger = new Messenger({
         logger: this._logger
@@ -3876,9 +3882,10 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
 
     function connect(callback) {
         self._connect(coordinatorUrl, function() {
-            self._initHashing();
-            self._initLookup();
-            callback();
+            self._initHashing(function(err) {
+                self._initLookup();
+                callback(err);
+            });
         });
     };
 };
@@ -3891,7 +3898,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
 WebCDN.prototype.load = function(hash) {
     var self = this;
     this._tracker.getInfo(hash, function(data) {
-        var download = new Download(data.peerid, data.hash, self._peernet, self._logger, function(data, err) {
+        var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
         download.start();
@@ -3914,10 +3921,19 @@ WebCDN.prototype._connect = function(url, callback) {
  * Computes an unique hash value for each resource marked with a data-webcdn-callback attribute 
  * @private
  */
-WebCDN.prototype._initHashing = function() {
+WebCDN.prototype._initHashing = function(callback) {
+    var errors = [];
     this._items.forEach(function(item) {
-        item.dataset.webcdnHash = this._getItemHash(item);
+        if (!item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+            errors.push(new Error("Missing webcdn hash for item " + item.dataset.webcdnFallback));
+        } else if (item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+            // use precomputed hash for content identification and data integrity 
+            item.dataset.webcdnContentHash = item.dataset.webcdnHash;
+        } else {
+            item.dataset.webcdnHash = this._getItemHash(item);
+        }
     }, this);
+    callback(errors);
 };
 
 /**
@@ -3936,7 +3952,9 @@ WebCDN.prototype._getItemHash = function(item) {
  */
 WebCDN.prototype._initLookup = function() {
     this._items.forEach(function(item) {
-        this.load(item.dataset.webcdnHash);
+        if (item.dataset.hasOwnProperty("webcdnHash")) {
+            this.load(item.dataset.webcdnHash);
+        }
     }, this);
 };
 
@@ -3986,7 +4004,23 @@ WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
-    }
+    };
+
+    // Update coordinator
+    this._update([{
+        hash: hash,
+        size: arraybuffer.byteLength,
+        contentHash: element.dataset.webcdnContentHash
+    }]);
+};
+
+/**
+ * Send a "update" message to inform the coordinator about stored items
+ * @param {Array} hashes Content hashes computed by _getItemHash()
+ * @private
+ */
+WebCDN.prototype._update = function(hashes) {
+    this._messenger.send('update', hashes);
 };
 
 /**
