@@ -1,4 +1,4 @@
-var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
+var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 
 /**
@@ -16,12 +16,21 @@ Statistics.addHost = function() {
         "uuid": window.webcdn_uuid,
         "active": true
     };
-    if (window.performance && window.performance.timing) {
-        data.performance = {};
-        data.performance.timing = window.performance.timing.toJSON();
-    }
     Statistics.sendMessage("host:add", data);
 };
+
+/**
+ * Send timing data to the mediator
+ * @static
+ */
+Statistics.sendTimingData = function() {
+    if (window.performance && window.performance.timing) {
+        var data = window.performance.timing.toJSON();
+        data.page_load = data.loadEventEnd - data.navigationStart;
+        Statistics.sendMessage("plain:timing", data);
+    }
+};
+
 
 /**
  * Remove current peer from the mediator server
@@ -141,4 +150,5 @@ function createWebsocket()  {
     return ws;
 };
 
+window.WebCDNStatistics = Statistics;
 module.exports = Statistics;
