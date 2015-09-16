@@ -125,19 +125,4 @@ describe('WebCDN', function() {
 
         });
     });
-
-    xdescribe('._loadImageByCDN', function() {
-        xit('should load the image and convert to base64 string', function(done) {
-            var hash = "35c22d5973cb21ae0887eda12185747e7a94cd74";
-            self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn._loadImageByCDN(hash);
-                var image = document.querySelector('[data-webcdn-hash="' + hash + '"]');
-                setTimeout(function() {
-                    expect(image.src).not.to.be.empty;
-                    done();
-                }, 40);
-            });
-        });
-    });
-
 });
