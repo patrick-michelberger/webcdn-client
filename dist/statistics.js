@@ -143,7 +143,7 @@ Statistics.mark = function(name) {
 
 
 Statistics.measureByType = function(type, hash)  {
-    var name = type + "_duration";
+    var name = duration = type + "_duration";
     var start = type + "_start";
     var end = type + "_end";
 
@@ -152,7 +152,7 @@ Statistics.measureByType = function(type, hash)  {
         start += ":" + hash;
         end += ":" + hash;
     }
-    
+
     // Measure
     window.performance.measure(name, start, end);
 
@@ -165,12 +165,15 @@ Statistics.measureByType = function(type, hash)  {
             duration: result[0].duration
         };
         if (hash) {
-            data[hash] = hash;
+            data["hash"] = hash;
+            if (type === "lookup" && Statistics.WS_CONNECT_DURATION) {
+                data["ws_connect_duration"] = Statistics.WS_CONNECT_DURATION;
+            }
             var resource = Statistics.resources[hash] = this._createResource(hash);
             resource.setDuration(type, result[0].duration);
+            // Send measurement to server
+            Statistics.sendMessage(duration, data);
         }
-        // Send measurement to server 
-        // Statistics.sendMessage(type, data);
         return result[0].duration;
     } else {
         return false;
@@ -216,7 +219,7 @@ Statistics.measure = function() {
 Statistics._createResource = function(hash) {
     if (Statistics.resources && Statistics.resources[hash]) {
         return Statistics.resources[hash];
-    } 
+    }
     return new Resource(hash, Statistics.WS_CONNECT_DURATION);
 };
 
