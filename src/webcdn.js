@@ -218,7 +218,6 @@ WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
-            console.log("element.src: ", element.src);
             break;
         case 'SCRIPT':
             blob = new Blob([arraybuffer], {

@@ -61,7 +61,6 @@ Download.prototype._loadImageByCDN = function(hash) {
                     var arraybuffer = this.response;
                     if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
                         // Create missing content hash
-                        console.log("create missing content hash");
                         element.dataset.webcdnContentHash = self._createContentHash(arraybuffer);
                     }
                     Statistics.mark("cdn_fallback_end:" + self.hash);
