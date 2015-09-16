@@ -1,11 +1,15 @@
 var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
+var Resource = require('./resource.js');
 
 /**
  * Statistics module 
  * @constructor 
  */
+
 var Statistics = {};
+Statistics.WS_CONNECT_DURATION = false;
+Statistics.resources = {}; // .resources[hash] = Resource
 
 /**
  * Register current peer to the mediator server
@@ -30,7 +34,6 @@ Statistics.sendTimingData = function() {
         Statistics.sendMessage("plain:timing", data);
     }
 };
-
 
 /**
  * Remove current peer from the mediator server
@@ -100,6 +103,43 @@ Statistics.mark = function(name) {
     }
 };
 
+
+Statistics.measureByType = function(type, hash)  {
+    var name = type + "_duration";
+    var start = type + "_start";
+    var end = type + "_end";
+
+    if (hash) {
+        name += ":" + hash;
+        start += ":" + hash;
+        end += ":" + hash;
+    }
+    
+    // Measure
+    window.performance.measure(name, start, end);
+
+    // Query Measure
+    var result = window.performance.getEntriesByName(name);
+
+    if (result && result[0]) {
+        var data = {
+            uuid: window.webcdn_uuid,
+            duration: result[0].duration
+        };
+        if (hash) {
+            data[hash] = hash;
+            var resource = Statistics.resources[hash] = this._createResource(hash);
+            resource.setDuration(type, result[0].duration);
+        }
+        // Send measurement to server 
+        // Statistics.sendMessage(type, data);
+        return result[0].duration;
+    } else {
+        return false;
+    }
+
+};
+
 /**
  * Iterates over all timing marks, computes the respective measures and sends them to the mediator.
  * @static
@@ -110,11 +150,11 @@ Statistics.measure = function() {
         var arr = mark.name.split(":");
         var type = arr[0];
         var id = arr[1];
-        if (type === "pc_connect_start") {
-            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
-        }
         if (type === "lookup_start") {
             window.performance.measure("lookup_duration:" + id, "lookup_start:" + id, "lookup_end:" + id);
+        }
+        if (type === "pc_connect_start") {
+            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
         }
         if (type === "fetch_start") {
             window.performance.measure("fetch_duration:" + id, "fetch_start:" + id, "fetch_end:" + id);
@@ -135,6 +175,14 @@ Statistics.measure = function() {
     });
 };
 
+Statistics._createResource = function(hash) {
+    if (Statistics.resources && Statistics.resources[hash]) {
+        return Statistics.resources[hash];
+    } 
+    return new Resource(hash, Statistics.WS_CONNECT_DURATION);
+};
+
+
 function createWebsocket()  {
     var ws = new WebSocket(url);
 
@@ -142,10 +190,7 @@ function createWebsocket()  {
         var msg = JSON.parse(event.data);
     };
 
-    ws.onopen = function(event) {
-        Statistics.addHost();
-        Statistics.queryResourceTiming();
-    };
+    ws.onopen = function(event) {};
 
     return ws;
 };
