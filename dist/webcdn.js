@@ -2957,19 +2957,19 @@ function Download(peerid, hash, contentHash, peernet, logger, callback) {
 Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
-        // Statistics.mark("pc_connect_start:" + this.peerid);
+        Statistics.mark("pc_connect_start:" + this.hash);
         var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
             self.finish(arraybuffer);
         });
     } else {
-        // CDN Fallback
-        this._loadImageByCDN(this.hash);
+        Statistics.mark("cdn_fallback_start:" + this.hash);
+        self._loadImageByCDN(self.hash);
     }
 };
 
 Download.prototype.finish = function(arraybuffer) {
-    Statistics.mark("fetch_end:" + this.hash);
-    
+    // Statistics.mark("fetch_end:" + this.hash);
+
     // Data integrity check
     if (this._createContentHash(arraybuffer) !== this.contentHash) {
         this._loadImageByCDN(this.hash);
@@ -2989,29 +2989,30 @@ Download.prototype._loadImageByCDN = function(hash) {
     var url = element.dataset.webcdnFallback;
 
     if (url) {
-        var req = new XMLHttpRequest();
-        req.open('GET', url, true);
-        req.responseType = 'arraybuffer';
-        req.onerror = function(err) {
-            element.setAttribute('crossOrigin', 'anonymous');
-            element.src = url;
-            self.logger.handleError(err);
-        };
-        req.onload = function(err) {
-            window.URL.revokeObjectURL(this.src);
-            if (this.status == 200) {
-                var arraybuffer = this.response;
-                if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
-                    // Create missing content hash
-                    element.dataset.webcdnContentHash = self._createContentHash(arraybuffer);
+            var req = new XMLHttpRequest();
+            req.open('GET', url, true);
+            req.responseType = 'arraybuffer';
+            req.onerror = function(err) {
+                element.setAttribute('crossOrigin', 'anonymous');
+                element.src = url;
+                self.logger.handleError(err);
+            };
+            req.onload = function(err) {
+                if (this.status == 200) {
+                    var arraybuffer = this.response;
+                    if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
+                        // Create missing content hash
+                        console.log("create missing content hash");
+                        element.dataset.webcdnContentHash = self._createContentHash(arraybuffer);
+                    }
+                    Statistics.mark("cdn_fallback_end:" + self.hash);
+                    var duration = Statistics.measureByType("cdn_fallback", self.hash);
+                    self.peernet.finishDownload(self.hash, arraybuffer, self.done);
+                } else {
+                    self.logger.trace('XHR returned ' + this.status);
                 }
-                self.peernet.finishDownload(self.hash, arraybuffer, self.done);
-                // Statistics.queryResourceTiming(url);
-            } else {
-                self.logger.trace('XHR returned ' + this.status);
-            }
-        };
-        req.send();
+            };
+            req.send();
     } else {
         self.logger.trace("No WebCDN fallback URL available");
     }
@@ -3025,7 +3026,8 @@ Download.prototype._loadImageByCDN = function(hash) {
 Download.prototype._createContentHash = function(content) {
     return sha1(new Uint8Array(content));
 };
-},{"./statistics.js":21,"sha1":14}],16:[function(require,module,exports){
+
+},{"./statistics.js":22,"sha1":14}],16:[function(require,module,exports){
 /**
  * Receive user's current geolocation 
  * @param {getCurrentPositionCallback} callback - The callback that handles the response.
@@ -3410,7 +3412,7 @@ Peer.prototype._updateUploadRatio = function(hash, bytes)  {
         "size": bytes
     });
 };
-},{"./statistics.js":21,"./utils.js":23,"array-buffer-concat":1,"events":6,"util":10}],20:[function(require,module,exports){
+},{"./statistics.js":22,"./utils.js":24,"array-buffer-concat":1,"events":6,"util":10}],20:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
@@ -3544,14 +3546,55 @@ Peernet.prototype.finishDownload = function(hash, content, callback) {
 };
 
 },{"./peer.js":19,"events":6,"get-browser-rtc":11,"util":10}],21:[function(require,module,exports){
-var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
+module.exports = Resource;
+
+/**
+ * Creates a new Resource instance
+ * @param {String} hash - unique resource ID
+ * @param {Number} wsConnectDuration - websocket connect duration
+ * @constructor
+ */
+function Resource(hash, wsConnectDuration) {
+    if (typeof hash === 'undefined') {
+        throw new Error('Hash ID as first parameter required!');
+    }
+    if (typeof wsConnectDuration === 'undefined') {
+        throw new Error('Websocket connect duration as second parameter required!');
+    }
+	this.hash = hash 
+	this.leecher = window.webcdn_uuid;
+	this.ws_connect = wsConnectDuration;
+};
+
+Resource.prototype.setDuration = function(type, value) {
+	this[type] = value;
+};
+
+/*
+var ResourceSchema = {
+    "leecher": String,
+    "seeder": String,
+    "ws_connect": Number,
+    "lookup": Number,
+    "pc_connect": Number,
+    "fetch": Number,
+    "sendImage_duration": Number,
+    "total": Number
+};
+*/
+},{}],22:[function(require,module,exports){
+var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
+var Resource = require('./resource.js');
 
 /**
  * Statistics module 
  * @constructor 
  */
+
 var Statistics = {};
+Statistics.WS_CONNECT_DURATION = false;
+Statistics.resources = {}; // .resources[hash] = Resource
 
 /**
  * Register current peer to the mediator server
@@ -3562,11 +3605,19 @@ Statistics.addHost = function() {
         "uuid": window.webcdn_uuid,
         "active": true
     };
-    if (window.performance && window.performance.timing) {
-        data.performance = {};
-        data.performance.timing = window.performance.timing.toJSON();
-    }
     Statistics.sendMessage("host:add", data);
+};
+
+/**
+ * Send timing data to the mediator
+ * @static
+ */
+Statistics.sendTimingData = function() {
+    if (window.performance && window.performance.timing) {
+        var data = window.performance.timing.toJSON();
+        data.page_load = data.loadEventEnd - data.navigationStart;
+        Statistics.sendMessage("plain:timing", data);
+    }
 };
 
 /**
@@ -3637,6 +3688,43 @@ Statistics.mark = function(name) {
     }
 };
 
+
+Statistics.measureByType = function(type, hash)  {
+    var name = type + "_duration";
+    var start = type + "_start";
+    var end = type + "_end";
+
+    if (hash) {
+        name += ":" + hash;
+        start += ":" + hash;
+        end += ":" + hash;
+    }
+    
+    // Measure
+    window.performance.measure(name, start, end);
+
+    // Query Measure
+    var result = window.performance.getEntriesByName(name);
+
+    if (result && result[0]) {
+        var data = {
+            uuid: window.webcdn_uuid,
+            duration: result[0].duration
+        };
+        if (hash) {
+            data[hash] = hash;
+            var resource = Statistics.resources[hash] = this._createResource(hash);
+            resource.setDuration(type, result[0].duration);
+        }
+        // Send measurement to server 
+        // Statistics.sendMessage(type, data);
+        return result[0].duration;
+    } else {
+        return false;
+    }
+
+};
+
 /**
  * Iterates over all timing marks, computes the respective measures and sends them to the mediator.
  * @static
@@ -3647,11 +3735,11 @@ Statistics.measure = function() {
         var arr = mark.name.split(":");
         var type = arr[0];
         var id = arr[1];
-        if (type === "pc_connect_start") {
-            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
-        }
         if (type === "lookup_start") {
             window.performance.measure("lookup_duration:" + id, "lookup_start:" + id, "lookup_end:" + id);
+        }
+        if (type === "pc_connect_start") {
+            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
         }
         if (type === "fetch_start") {
             window.performance.measure("fetch_duration:" + id, "fetch_start:" + id, "fetch_end:" + id);
@@ -3672,6 +3760,14 @@ Statistics.measure = function() {
     });
 };
 
+Statistics._createResource = function(hash) {
+    if (Statistics.resources && Statistics.resources[hash]) {
+        return Statistics.resources[hash];
+    } 
+    return new Resource(hash, Statistics.WS_CONNECT_DURATION);
+};
+
+
 function createWebsocket()  {
     var ws = new WebSocket(url);
 
@@ -3679,17 +3775,15 @@ function createWebsocket()  {
         var msg = JSON.parse(event.data);
     };
 
-    ws.onopen = function(event) {
-        Statistics.addHost();
-        Statistics.queryResourceTiming();
-    };
+    ws.onopen = function(event) {};
 
     return ws;
 };
 
+window.WebCDNStatistics = Statistics;
 module.exports = Statistics;
 
-},{}],22:[function(require,module,exports){
+},{"./resource.js":21}],23:[function(require,module,exports){
 var Statistics = require('./statistics.js');
 
 module.exports = Tracker;
@@ -3708,7 +3802,7 @@ Tracker.prototype.getInfo = function(hash, callback) {
 };
 
 
-},{"./statistics.js":21}],23:[function(require,module,exports){
+},{"./statistics.js":22}],24:[function(require,module,exports){
 var Utils = {};
 
 Utils.marshalBuffer = function(buffer) {
@@ -3748,7 +3842,7 @@ Utils.unmarshal = function(data) {
 };
 
 module.exports = Utils;
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 /** 
  * Generates a unique user identification
  * @return {String} uuid - unique user identification
@@ -3779,7 +3873,7 @@ var UUID = (function() {
 })();
 
 module.exports = UUID;
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 'use strict';
 
 /**
@@ -3856,7 +3950,7 @@ function WebCDN(config) {
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
     var id = getQueryId(coordinatorUrl);
-    callback = callback || function() {};
+    callback = callback ||   function() {};
 
     if (!id) {
         coordinatorUrl += "?id=" + this.uuid;
@@ -3884,11 +3978,11 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
     }
 
     function connect(callback) {
+        Statistics.mark("ws_connect_start");
         self._connect(coordinatorUrl, function() {
-            self._initHashing(function(err) {
-                self._initLookup();
-                callback(err);
-            });
+            Statistics.mark("ws_connect_end");
+            Statistics.WS_CONNECT_DURATION = Statistics.measureByType("ws_connect");
+            self._initLoad();
         });
     };
 };
@@ -3900,7 +3994,10 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
  */
 WebCDN.prototype.load = function(hash) {
     var self = this;
+    Statistics.mark("lookup_start:" + hash);
     this._tracker.getInfo(hash, function(data) {
+        Statistics.mark("lookup_end:" + hash);
+        Statistics.measureByType('lookup', hash);
         var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
@@ -3920,23 +4017,29 @@ WebCDN.prototype._connect = function(url, callback) {
     });
 };
 
-/**
- * Computes an unique hash value for each resource marked with a data-webcdn-callback attribute 
- * @private
- */
-WebCDN.prototype._initHashing = function(callback) {
+
+WebCDN.prototype._initLoad = function() {
     var errors = [];
     this._items.forEach(function(item) {
-        if (!item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
-            errors.push(new Error("Missing webcdn hash for item " + item.dataset.webcdnFallback));
-        } else if (item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
-            // use precomputed hash for content identification and data integrity 
-            item.dataset.webcdnContentHash = item.dataset.webcdnHash;
-        } else {
-            item.dataset.webcdnHash = this._getItemHash(item);
-        }
+        this._createHash(item);
+        this.load(item.dataset.webcdnHash);
     }, this);
-    callback(errors);
+};
+
+/**
+ * Computes an unique hash value for resource marked with a data-webcdn-callback attribute 
+ * @param {DOMObject} item
+ * @private
+ */
+WebCDN.prototype._createHash = function(item) {
+    if (!item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+        errors.push(new Error("Missing webcdn hash for item " + item.dataset.webcdnFallback));
+    } else if (item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+        // use precomputed hash for content identification and data integrity 
+        item.dataset.webcdnContentHash = item.dataset.webcdnHash;
+    } else {
+        item.dataset.webcdnHash = this._getItemHash(item);
+    }
 };
 
 /**
@@ -3982,12 +4085,16 @@ WebCDN.prototype._sendGeolocation = function() {
 WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var blob;
     var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
+    element.onload = function() {
+        window.URL.revokeObjectURL(element.src);
+    };
     switch (element.tagName) {
         case 'IMG':
             blob = new Blob([arraybuffer], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
+            console.log("element.src: ", element.src);
             break;
         case 'SCRIPT':
             blob = new Blob([arraybuffer], {
@@ -4057,4 +4164,4 @@ function bucketizeResources(DOMelements, bucketUrl) {
     });
 };
 
-},{"./lib/download.js":15,"./lib/geo.js":16,"./lib/logger.js":17,"./lib/messenger.js":18,"./lib/peernet.js":20,"./lib/statistics.js":21,"./lib/tracker.js":22,"./lib/uuid.js":24,"events":6,"sha1":14,"util":10}]},{},[25]);
+},{"./lib/download.js":15,"./lib/geo.js":16,"./lib/logger.js":17,"./lib/messenger.js":18,"./lib/peernet.js":20,"./lib/statistics.js":22,"./lib/tracker.js":23,"./lib/uuid.js":25,"events":6,"sha1":14,"util":10}]},{},[26]);

@@ -1,3 +1,41 @@
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+module.exports = Resource;
+
+/**
+ * Creates a new Resource instance
+ * @param {String} hash - unique resource ID
+ * @param {Number} wsConnectDuration - websocket connect duration
+ * @constructor
+ */
+function Resource(hash, wsConnectDuration) {
+    if (typeof hash === 'undefined') {
+        throw new Error('Hash ID as first parameter required!');
+    }
+    if (typeof wsConnectDuration === 'undefined') {
+        throw new Error('Websocket connect duration as second parameter required!');
+    }
+	this.hash = hash 
+	this.leecher = window.webcdn_uuid;
+	this.ws_connect = wsConnectDuration;
+};
+
+Resource.prototype.setDuration = function(type, value) {
+	this[type] = value;
+};
+
+/*
+var ResourceSchema = {
+    "leecher": String,
+    "seeder": String,
+    "ws_connect": Number,
+    "lookup": Number,
+    "pc_connect": Number,
+    "fetch": Number,
+    "sendImage_duration": Number,
+    "total": Number
+};
+*/
+},{}],2:[function(require,module,exports){
 var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 var Resource = require('./resource.js');
@@ -197,3 +235,5 @@ function createWebsocket()  {
 
 window.WebCDNStatistics = Statistics;
 module.exports = Statistics;
+
+},{"./resource.js":1}]},{},[2]);
