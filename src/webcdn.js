@@ -74,7 +74,7 @@ function WebCDN(config) {
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
     var id = getQueryId(coordinatorUrl);
-    callback = callback || function() {};
+    callback = callback ||   function() {};
 
     if (!id) {
         coordinatorUrl += "?id=" + this.uuid;
@@ -102,11 +102,11 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
     }
 
     function connect(callback) {
+        Statistics.mark("ws_connect_start");
         self._connect(coordinatorUrl, function() {
-            self._initHashing(function(err) {
-                self._initLookup();
-                callback(err);
-            });
+            Statistics.mark("ws_connect_end");
+            Statistics.WS_CONNECT_DURATION = Statistics.measureByType("ws_connect");
+            self._initLoad();
         });
     };
 };
@@ -118,7 +118,10 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
  */
 WebCDN.prototype.load = function(hash) {
     var self = this;
+    Statistics.mark("lookup_start:" + hash);
     this._tracker.getInfo(hash, function(data) {
+        Statistics.mark("lookup_end:" + hash);
+        Statistics.measureByType('lookup', hash);
         var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
@@ -138,23 +141,29 @@ WebCDN.prototype._connect = function(url, callback) {
     });
 };
 
-/**
- * Computes an unique hash value for each resource marked with a data-webcdn-callback attribute 
- * @private
- */
-WebCDN.prototype._initHashing = function(callback) {
+
+WebCDN.prototype._initLoad = function() {
     var errors = [];
     this._items.forEach(function(item) {
-        if (!item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
-            errors.push(new Error("Missing webcdn hash for item " + item.dataset.webcdnFallback));
-        } else if (item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
-            // use precomputed hash for content identification and data integrity 
-            item.dataset.webcdnContentHash = item.dataset.webcdnHash;
-        } else {
-            item.dataset.webcdnHash = this._getItemHash(item);
-        }
+        this._createHash(item);
+        this.load(item.dataset.webcdnHash);
     }, this);
-    callback(errors);
+};
+
+/**
+ * Computes an unique hash value for resource marked with a data-webcdn-callback attribute 
+ * @param {DOMObject} item
+ * @private
+ */
+WebCDN.prototype._createHash = function(item) {
+    if (!item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+        errors.push(new Error("Missing webcdn hash for item " + item.dataset.webcdnFallback));
+    } else if (item.dataset.hasOwnProperty("webcdnHash") && this.INTEGRITY_IS_ACTIVE) {
+        // use precomputed hash for content identification and data integrity 
+        item.dataset.webcdnContentHash = item.dataset.webcdnHash;
+    } else {
+        item.dataset.webcdnHash = this._getItemHash(item);
+    }
 };
 
 /**
@@ -200,12 +209,16 @@ WebCDN.prototype._sendGeolocation = function() {
 WebCDN.prototype.createObjectURLFromArrayBuffer = function(hash, arraybuffer) {
     var blob;
     var element = document.querySelector('[data-webcdn-hash="' + hash + '"]');
+    element.onload = function() {
+        window.URL.revokeObjectURL(element.src);
+    };
     switch (element.tagName) {
         case 'IMG':
             blob = new Blob([arraybuffer], {
                 type: 'application/octet-stream'
             });
             element.src = window.URL.createObjectURL(blob);
+            console.log("element.src: ", element.src);
             break;
         case 'SCRIPT':
             blob = new Blob([arraybuffer], {
