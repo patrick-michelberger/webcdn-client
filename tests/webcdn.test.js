@@ -24,17 +24,6 @@ describe('WebCDN', function() {
         });
     });
 
-    describe('.initHashing', function() {
-        it('should hash each marked P2P object', function() {
-            self.webcdn._initHashing(function(errors) {
-                var items = [].slice.call(document.querySelectorAll('[data-webcdn-fallback]'));
-                items.forEach(function(item) {
-                    expect(item.dataset.webcdnHash).not.to.be.empty;
-                });
-            });
-        });
-    });
-
     describe('.getItemHash', function() {
         it('should return a hash for a DOM element', function() {
             var imageNode = document.querySelector('[data-webcdn-fallback]');
@@ -87,7 +76,7 @@ describe('WebCDN', function() {
         });
     });
 
-    describe('._initLookup', function() {
+    describe('._initLoad', function() {
         it('should send three initial lookup requests to the coordinator', function(done) {
             var i = 0;
             mockServer.on('message', function(data) {
@@ -100,9 +89,7 @@ describe('WebCDN', function() {
                 }
             });
             self.webcdn._connect('ws://localhost:8080?id=' + uuid, function() {
-                self.webcdn._initHashing(function() {
-                    self.webcdn._initLookup();
-                });
+                self.webcdn._initLoad();
             });
 
         });
