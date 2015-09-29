@@ -16,7 +16,6 @@ function Download(peerid, hash, contentHash, peernet, logger, callback) {
 Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
-        Statistics.mark("pc_connect_start:" + this.hash);
         var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
             self.finish(arraybuffer);
         });
