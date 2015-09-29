@@ -60,6 +60,7 @@ Peernet.prototype._send = function(peerid, data, callback) {
         this._reset(peerid);
         return;
     }
+    console.log("dataChannel.readyState: ", dataChannel.readyState);
     if (dataChannel.readyState === 'open') {
         dataChannel.send(data);
     } else if (dataChannel.readyState === 'connecting') {

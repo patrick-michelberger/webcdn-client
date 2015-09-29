@@ -3283,6 +3283,7 @@ Peer.prototype._createPeerConnection = function() {
 
     // ICE handlers
     pc.onicecandidate = function(event) {
+        console.log("onicecandidate: ", event.candidate);
         if (event.candidate && self._originator === true) {
             self._iceCallback.call(self, event);
         }
@@ -3291,6 +3292,15 @@ Peer.prototype._createPeerConnection = function() {
         if (self._originator === true) {
             self.doOffer();
         }
+    };
+
+    pc.onsignalingstatechange = function()  {
+        console.log("pc.signalingState: ", pc.signalingState);
+    };
+
+    pc.oniceconnectionstatechange = function(evt) {
+        console.log("pc.iceConnectionState: ", pc.iceConnectionState);
+        console.log("pc.iceGatheringState: ", pc.iceGatheringState);
     };
 
     // DateChannel creation handler (other peer)
@@ -3404,8 +3414,6 @@ Peer.prototype._sendImage = function(hash) {
 };
 
 Peer.prototype._relay = function(data) {
-    console.log("send relay messge to " + this._id);
-    console.log("data: ", data);
     this._signalChannel.send('relay', data, this._id);
 };
 
@@ -3481,6 +3489,7 @@ Peernet.prototype._send = function(peerid, data, callback) {
         this._reset(peerid);
         return;
     }
+    console.log("dataChannel.readyState: ", dataChannel.readyState);
     if (dataChannel.readyState === 'open') {
         dataChannel.send(data);
     } else if (dataChannel.readyState === 'connecting') {
