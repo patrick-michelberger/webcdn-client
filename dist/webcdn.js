@@ -2957,7 +2957,6 @@ function Download(peerid, hash, contentHash, peernet, logger, callback) {
 Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
-        Statistics.mark("pc_connect_start:" + this.hash);
         var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
             self.finish(arraybuffer);
         });
@@ -3296,6 +3295,8 @@ Peer.prototype._createPeerConnection = function() {
         event.channel.onmessage = function(event) {
             self._handleMessage.call(self, event);
         };
+        Statistics.mark("pc_connect_end:" + self._id);
+        Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", self._id);
     };
     return pc;
 };
@@ -3411,11 +3412,13 @@ Peer.prototype._updateUploadRatio = function(hash, bytes)  {
         "size": bytes
     });
 };
+
 },{"./statistics.js":22,"./utils.js":24,"array-buffer-concat":1,"events":6,"util":10}],20:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
 var getBrowserRTC = require('get-browser-rtc');
+var Statistics = require('./statistics.js');
 
 module.exports = Peernet;
 inherits(Peernet, EventEmitter);
@@ -3483,7 +3486,6 @@ Peernet.prototype._send = function(peerid, data, callback) {
             dataChannel.queued = [data];
         }
         dataChannel.onopen = function(event) {
-            // Statistics.mark("pc_connect_end:" + self._id);
             for (var i = 0; i < dataChannel.queued.length; i++) {
                 dataChannel.send(dataChannel.queued[i]);
             }
@@ -3500,6 +3502,7 @@ Peernet.prototype._send = function(peerid, data, callback) {
 Peernet.prototype._createConnection = function(peerid, originator) {
     var self = this;
     if (!this._peers[peerid]) {
+        Statistics.mark("pc_connect_start:" + peerid);
         // Create new peer
         this._peers[peerid] = new Peer({
             "id": peerid,
@@ -3544,7 +3547,7 @@ Peernet.prototype.finishDownload = function(hash, content, callback) {
     callback(this.downloaded[hash]);
 };
 
-},{"./peer.js":19,"events":6,"get-browser-rtc":11,"util":10}],21:[function(require,module,exports){
+},{"./peer.js":19,"./statistics.js":22,"events":6,"get-browser-rtc":11,"util":10}],21:[function(require,module,exports){
 module.exports = Resource;
 
 /**
@@ -3593,6 +3596,7 @@ var Resource = require('./resource.js');
 
 var Statistics = {};
 Statistics.WS_CONNECT_DURATION = false;
+Statistics.PC_CONNECT_DURATION = false;
 Statistics.resources = {}; // .resources[hash] = Resource
 
 /**
@@ -3687,8 +3691,8 @@ Statistics.mark = function(name) {
     }
 };
 
-
 Statistics.measureByType = function(type, hash)  {
+    console.log("measure " + type + " with hash " + hash);
     var name = duration = type + "_duration";
     var start = type + "_start";
     var end = type + "_end";
@@ -3714,11 +3718,14 @@ Statistics.measureByType = function(type, hash)  {
             data["hash"] = hash;
             if (type === "lookup" && Statistics.WS_CONNECT_DURATION) {
                 data["ws_connect_duration"] = Statistics.WS_CONNECT_DURATION;
+            } else if (type === "pc_connect") {
+                return result[0].duration;
+            } else  {
+                var resource = Statistics.resources[hash] = this._createResource(hash);
+                resource.setDuration(type, result[0].duration);
+                // Send measurement to server
+                // Statistics.sendMessage(duration, data);
             }
-            var resource = Statistics.resources[hash] = this._createResource(hash);
-            resource.setDuration(type, result[0].duration);
-            // Send measurement to server
-            Statistics.sendMessage(duration, data);
         }
         return result[0].duration;
     } else {

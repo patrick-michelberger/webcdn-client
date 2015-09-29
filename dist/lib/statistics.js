@@ -9,6 +9,7 @@ var Resource = require('./resource.js');
 
 var Statistics = {};
 Statistics.WS_CONNECT_DURATION = false;
+Statistics.PC_CONNECT_DURATION = false;
 Statistics.resources = {}; // .resources[hash] = Resource
 
 /**
@@ -103,8 +104,8 @@ Statistics.mark = function(name) {
     }
 };
 
-
 Statistics.measureByType = function(type, hash)  {
+    console.log("measure " + type + " with hash " + hash);
     var name = duration = type + "_duration";
     var start = type + "_start";
     var end = type + "_end";
@@ -130,11 +131,14 @@ Statistics.measureByType = function(type, hash)  {
             data["hash"] = hash;
             if (type === "lookup" && Statistics.WS_CONNECT_DURATION) {
                 data["ws_connect_duration"] = Statistics.WS_CONNECT_DURATION;
+            } else if (type === "pc_connect") {
+                return result[0].duration;
+            } else  {
+                var resource = Statistics.resources[hash] = this._createResource(hash);
+                resource.setDuration(type, result[0].duration);
+                // Send measurement to server
+                // Statistics.sendMessage(duration, data);
             }
-            var resource = Statistics.resources[hash] = this._createResource(hash);
-            resource.setDuration(type, result[0].duration);
-            // Send measurement to server
-            Statistics.sendMessage(duration, data);
         }
         return result[0].duration;
     } else {
