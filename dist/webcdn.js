@@ -2971,11 +2971,11 @@ Download.prototype.start = function() {
 
 Download.prototype.finish = function(arraybuffer) {
     // Data integrity check
-    if (this._createContentHash(arraybuffer) !== this.contentHash) {
-        this._loadImageByCDN(this.hash);
-    } else {
+    //if (this._createContentHash(arraybuffer) !== this.contentHash) {
+    //    this._loadImageByCDN(this.hash);
+    //} else {
         this.peernet.finishDownload(this.hash, arraybuffer, this.done);
-    }
+    //}
 };
 
 /**
