@@ -1,4 +1,4 @@
-var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
+var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 var Resource = require('./resource.js');
 
@@ -58,7 +58,21 @@ Statistics.sendMessage = function(type, data) {
         type: type,
         data: data
     };
-    ws.send(JSON.stringify(message));
+
+    waitForConnection(function() {
+        ws.send(JSON.stringify(message));
+    }, 500);
+
+    function waitForConnection(callback, interval) {
+        if (ws.readyState === 1) {
+            callback();
+        } else {
+            var self = this;
+            setTimeout(function() {
+                waitForConnection(callback, interval);
+            }, interval);
+        }
+    };
 };
 
 /**
@@ -133,10 +147,9 @@ Statistics.measureByType = function(type, hash, peerid)  {
             }
             resource.setProperty(type, result[0].duration);
 
-            if (type === "cdn_fallback" || type === "fetch") {
+            if (type === "cdn_fallback" ||  type === "fetch") {
                 // send data to statistics server 
                 var data = JSON.stringify(resource);
-                console.log(data);
                 Statistics.sendMessage(duration, data);
             }
         }

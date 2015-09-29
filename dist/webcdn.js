@@ -2957,7 +2957,10 @@ function Download(peerid, hash, contentHash, peernet, logger, callback) {
 Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
+        Statistics.mark("fetch_start:" + self.hash);
         var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
+            Statistics.mark("fetch_end:" + self.hash);
+            Statistics.measureByType("fetch", self.hash, self.peerid);
             self.finish(arraybuffer);
         });
     } else {
@@ -2967,8 +2970,6 @@ Download.prototype.start = function() {
 };
 
 Download.prototype.finish = function(arraybuffer) {
-    // Statistics.mark("fetch_end:" + this.hash);
-
     // Data integrity check
     if (this._createContentHash(arraybuffer) !== this.contentHash) {
         this._loadImageByCDN(this.hash);
@@ -3568,7 +3569,7 @@ function Resource(hash, wsConnectDuration) {
 	this.ws_connect = wsConnectDuration;
 };
 
-Resource.prototype.setDuration = function(type, value) {
+Resource.prototype.setProperty = function(type, value) {
 	this[type] = value;
 };
 
@@ -3585,7 +3586,7 @@ var ResourceSchema = {
 };
 */
 },{}],22:[function(require,module,exports){
-var url = "ws://localhost:9000?id=" + window.webcdn_uuid;
+var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
 var Resource = require('./resource.js');
 
@@ -3645,7 +3646,21 @@ Statistics.sendMessage = function(type, data) {
         type: type,
         data: data
     };
-    ws.send(JSON.stringify(message));
+
+    waitForConnection(function() {
+        ws.send(JSON.stringify(message));
+    }, 500);
+
+    function waitForConnection(callback, interval) {
+        if (ws.readyState === 1) {
+            callback();
+        } else {
+            var self = this;
+            setTimeout(function() {
+                waitForConnection(callback, interval);
+            }, interval);
+        }
+    };
 };
 
 /**
@@ -3691,7 +3706,7 @@ Statistics.mark = function(name) {
     }
 };
 
-Statistics.measureByType = function(type, hash)  {
+Statistics.measureByType = function(type, hash, peerid)  {
     console.log("measure " + type + " with hash " + hash);
     var name = duration = type + "_duration";
     var start = type + "_start";
@@ -3710,28 +3725,26 @@ Statistics.measureByType = function(type, hash)  {
     var result = window.performance.getEntriesByName(name);
 
     if (result && result[0]) {
-        var data = {
-            uuid: window.webcdn_uuid,
-            duration: result[0].duration
-        };
-        if (hash) {
-            data["hash"] = hash;
-            if (type === "lookup" && Statistics.WS_CONNECT_DURATION) {
-                data["ws_connect_duration"] = Statistics.WS_CONNECT_DURATION;
-            } else if (type === "pc_connect") {
-                return result[0].duration;
-            } else  {
-                var resource = Statistics.resources[hash] = this._createResource(hash);
-                resource.setDuration(type, result[0].duration);
-                // Send measurement to server
-                // Statistics.sendMessage(duration, data);
+        if (type !== "ws_connect" && type !== "pc_connect" && hash) {
+            var resource = Statistics.resources[hash] = this._createResource(hash);
+            if (type === "lookup") {
+                resource.setProperty("ws_connect", Statistics.WS_CONNECT_DURATION);
+            }
+            if (type === "fetch") {
+                resource.setProperty("seeder", peerid);
+            }
+            resource.setProperty(type, result[0].duration);
+
+            if (type === "cdn_fallback" ||  type === "fetch") {
+                // send data to statistics server 
+                var data = JSON.stringify(resource);
+                Statistics.sendMessage(duration, data);
             }
         }
         return result[0].duration;
     } else {
         return false;
     }
-
 };
 
 /**

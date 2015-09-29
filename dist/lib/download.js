@@ -16,7 +16,10 @@ function Download(peerid, hash, contentHash, peernet, logger, callback) {
 Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
+        Statistics.mark("fetch_start:" + self.hash);
         var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
+            Statistics.mark("fetch_end:" + self.hash);
+            Statistics.measureByType("fetch", self.hash, self.peerid);
             self.finish(arraybuffer);
         });
     } else {
@@ -26,8 +29,6 @@ Download.prototype.start = function() {
 };
 
 Download.prototype.finish = function(arraybuffer) {
-    // Statistics.mark("fetch_end:" + this.hash);
-
     // Data integrity check
     if (this._createContentHash(arraybuffer) !== this.contentHash) {
         this._loadImageByCDN(this.hash);
