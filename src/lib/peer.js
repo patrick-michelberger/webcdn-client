@@ -90,6 +90,8 @@ Peer.prototype._createPeerConnection = function() {
         event.channel.onmessage = function(event) {
             self._handleMessage.call(self, event);
         };
+        Statistics.mark("pc_connect_end:" + self._id);
+        Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", self._id);
     };
     return pc;
 };

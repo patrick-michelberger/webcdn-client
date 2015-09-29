@@ -36,4 +36,4 @@ Utils.unmarshal = function(data) {
     return message;
 };
 
-module.exports = Utilities;
+module.exports = Utils;

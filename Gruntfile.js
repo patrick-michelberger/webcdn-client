@@ -113,6 +113,10 @@ module.exports = function(grunt) {
             main: {
                 src: 'src/webcdn.js',
                 dest: 'dist/webcdn.js'
+            },
+            statistics: {
+                src: 'src/lib/statistics.js',
+                dest: 'dist/statistics.js'
             }
         },
 

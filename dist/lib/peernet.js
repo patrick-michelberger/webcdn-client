@@ -2,6 +2,7 @@ var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var Peer = require('./peer.js');
 var getBrowserRTC = require('get-browser-rtc');
+var Statistics = require('./statistics.js');
 
 module.exports = Peernet;
 inherits(Peernet, EventEmitter);
@@ -69,7 +70,6 @@ Peernet.prototype._send = function(peerid, data, callback) {
             dataChannel.queued = [data];
         }
         dataChannel.onopen = function(event) {
-            // Statistics.mark("pc_connect_end:" + self._id);
             for (var i = 0; i < dataChannel.queued.length; i++) {
                 dataChannel.send(dataChannel.queued[i]);
             }
@@ -86,6 +86,7 @@ Peernet.prototype._send = function(peerid, data, callback) {
 Peernet.prototype._createConnection = function(peerid, originator) {
     var self = this;
     if (!this._peers[peerid]) {
+        Statistics.mark("pc_connect_start:" + peerid);
         // Create new peer
         this._peers[peerid] = new Peer({
             "id": peerid,

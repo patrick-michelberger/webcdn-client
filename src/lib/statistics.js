@@ -1,11 +1,16 @@
 var url = "ws://webcdn-mediator.herokuapp.com?id=" + window.webcdn_uuid;
 var ws = createWebsocket();
+var Resource = require('./resource.js');
 
 /**
  * Statistics module 
  * @constructor 
  */
+
 var Statistics = {};
+Statistics.WS_CONNECT_DURATION = false;
+Statistics.PC_CONNECT_DURATION = false;
+Statistics.resources = {}; // .resources[hash] = Resource
 
 /**
  * Register current peer to the mediator server
@@ -16,11 +21,19 @@ Statistics.addHost = function() {
         "uuid": window.webcdn_uuid,
         "active": true
     };
-    if (window.performance && window.performance.timing) {
-        data.performance = {};
-        data.performance.timing = window.performance.timing.toJSON();
-    }
     Statistics.sendMessage("host:add", data);
+};
+
+/**
+ * Send timing data to the mediator
+ * @static
+ */
+Statistics.sendTimingData = function() {
+    if (window.performance && window.performance.timing) {
+        var data = window.performance.timing.toJSON();
+        data.page_load = data.loadEventEnd - data.navigationStart;
+        Statistics.sendMessage("plain:timing", data);
+    }
 };
 
 /**
@@ -45,7 +58,21 @@ Statistics.sendMessage = function(type, data) {
         type: type,
         data: data
     };
-    ws.send(JSON.stringify(message));
+
+    waitForConnection(function() {
+        ws.send(JSON.stringify(message));
+    }, 500);
+
+    function waitForConnection(callback, interval) {
+        if (ws.readyState === 1) {
+            callback();
+        } else {
+            var self = this;
+            setTimeout(function() {
+                waitForConnection(callback, interval);
+            }, interval);
+        }
+    };
 };
 
 /**
@@ -91,6 +118,47 @@ Statistics.mark = function(name) {
     }
 };
 
+Statistics.measureByType = function(type, hash, peerid)  {
+    console.log("measure " + type + " with hash " + hash);
+    var name = duration = type + "_duration";
+    var start = type + "_start";
+    var end = type + "_end";
+
+    if (hash) {
+        name += ":" + hash;
+        start += ":" + hash;
+        end += ":" + hash;
+    }
+
+    // Measure
+    window.performance.measure(name, start, end);
+
+    // Query Measure
+    var result = window.performance.getEntriesByName(name);
+
+    if (result && result[0]) {
+        if (type !== "ws_connect" && type !== "pc_connect" && hash) {
+            var resource = Statistics.resources[hash] = this._createResource(hash);
+            if (type === "lookup") {
+                resource.setProperty("ws_connect", Statistics.WS_CONNECT_DURATION);
+            }
+            if (type === "fetch") {
+                resource.setProperty("seeder", peerid);
+            }
+            resource.setProperty(type, result[0].duration);
+
+            if (type === "cdn_fallback" ||  type === "fetch") {
+                // send data to statistics server 
+                var data = JSON.stringify(resource);
+                Statistics.sendMessage(duration, data);
+            }
+        }
+        return result[0].duration;
+    } else {
+        return false;
+    }
+};
+
 /**
  * Iterates over all timing marks, computes the respective measures and sends them to the mediator.
  * @static
@@ -101,11 +169,11 @@ Statistics.measure = function() {
         var arr = mark.name.split(":");
         var type = arr[0];
         var id = arr[1];
-        if (type === "pc_connect_start") {
-            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
-        }
         if (type === "lookup_start") {
             window.performance.measure("lookup_duration:" + id, "lookup_start:" + id, "lookup_end:" + id);
+        }
+        if (type === "pc_connect_start") {
+            window.performance.measure("pc_connect_duration:" + id, "pc_connect_start:" + id, "pc_connect_end:" + id);
         }
         if (type === "fetch_start") {
             window.performance.measure("fetch_duration:" + id, "fetch_start:" + id, "fetch_end:" + id);
@@ -126,6 +194,14 @@ Statistics.measure = function() {
     });
 };
 
+Statistics._createResource = function(hash) {
+    if (Statistics.resources && Statistics.resources[hash]) {
+        return Statistics.resources[hash];
+    }
+    return new Resource(hash, Statistics.WS_CONNECT_DURATION);
+};
+
+
 function createWebsocket()  {
     var ws = new WebSocket(url);
 
@@ -133,12 +209,10 @@ function createWebsocket()  {
         var msg = JSON.parse(event.data);
     };
 
-    ws.onopen = function(event) {
-        Statistics.addHost();
-        Statistics.queryResourceTiming();
-    };
+    ws.onopen = function(event) {};
 
     return ws;
 };
 
+window.WebCDNStatistics = Statistics;
 module.exports = Statistics;

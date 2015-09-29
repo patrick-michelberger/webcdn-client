@@ -16,19 +16,19 @@ function Download(peerid, hash, contentHash, peernet, logger, callback) {
 Download.prototype.start = function() {
     var self = this;
     if (this.peerid) {
-        // Statistics.mark("pc_connect_start:" + this.peerid);
+        Statistics.mark("fetch_start:" + self.hash);
         var peer = this.peernet.fetch(this.peerid, this.hash, function(arraybuffer)  {
+            Statistics.mark("fetch_end:" + self.hash);
+            Statistics.measureByType("fetch", self.hash, self.peerid);
             self.finish(arraybuffer);
         });
     } else {
-        // CDN Fallback
-        this._loadImageByCDN(this.hash);
+        Statistics.mark("cdn_fallback_start:" + this.hash);
+        self._loadImageByCDN(self.hash);
     }
 };
 
 Download.prototype.finish = function(arraybuffer) {
-    Statistics.mark("fetch_end:" + this.hash);
-    
     // Data integrity check
     if (this._createContentHash(arraybuffer) !== this.contentHash) {
         this._loadImageByCDN(this.hash);
@@ -48,29 +48,29 @@ Download.prototype._loadImageByCDN = function(hash) {
     var url = element.dataset.webcdnFallback;
 
     if (url) {
-        var req = new XMLHttpRequest();
-        req.open('GET', url, true);
-        req.responseType = 'arraybuffer';
-        req.onerror = function(err) {
-            element.setAttribute('crossOrigin', 'anonymous');
-            element.src = url;
-            self.logger.handleError(err);
-        };
-        req.onload = function(err) {
-            window.URL.revokeObjectURL(this.src);
-            if (this.status == 200) {
-                var arraybuffer = this.response;
-                if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
-                    // Create missing content hash
-                    element.dataset.webcdnContentHash = self._createContentHash(arraybuffer);
+            var req = new XMLHttpRequest();
+            req.open('GET', url, true);
+            req.responseType = 'arraybuffer';
+            req.onerror = function(err) {
+                element.setAttribute('crossOrigin', 'anonymous');
+                element.src = url;
+                self.logger.handleError(err);
+            };
+            req.onload = function(err) {
+                if (this.status == 200) {
+                    var arraybuffer = this.response;
+                    if (!element.dataset.hasOwnProperty("webcdnContentHash")) {
+                        // Create missing content hash
+                        element.dataset.webcdnContentHash = self._createContentHash(arraybuffer);
+                    }
+                    Statistics.mark("cdn_fallback_end:" + self.hash);
+                    var duration = Statistics.measureByType("cdn_fallback", self.hash);
+                    self.peernet.finishDownload(self.hash, arraybuffer, self.done);
+                } else {
+                    self.logger.trace('XHR returned ' + this.status);
                 }
-                self.peernet.finishDownload(self.hash, arraybuffer, self.done);
-                // Statistics.queryResourceTiming(url);
-            } else {
-                self.logger.trace('XHR returned ' + this.status);
-            }
-        };
-        req.send();
+            };
+            req.send();
     } else {
         self.logger.trace("No WebCDN fallback URL available");
     }
