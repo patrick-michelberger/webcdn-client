@@ -122,6 +122,7 @@ WebCDN.prototype.load = function(hash) {
     this._tracker.getInfo(hash, function(data) {
         Statistics.mark("lookup_end:" + hash);
         Statistics.measureByType('lookup', hash);
+        console.log("lookup-response: ", data);
         var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
