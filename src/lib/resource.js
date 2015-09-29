@@ -18,7 +18,7 @@ function Resource(hash, wsConnectDuration) {
 	this.ws_connect = wsConnectDuration;
 };
 
-Resource.prototype.setDuration = function(type, value) {
+Resource.prototype.setProperty = function(type, value) {
 	this[type] = value;
 };
 
