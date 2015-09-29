@@ -71,8 +71,6 @@ Peer.prototype._createPeerConnection = function() {
     var self = this;
     var pc = new this._wrtc.RTCPeerConnection({
         iceServers: [{
-            url: 'stun:stun.l.google.com:19302'
-        }, {
             url: 'turn:numb.viagenie.ca',
             credential: 'muazkh',
             username: 'webrtc@live.com'
