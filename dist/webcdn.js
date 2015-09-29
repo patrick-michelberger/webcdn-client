@@ -3402,6 +3402,7 @@ Peer.prototype._sendImage = function(hash) {
 };
 
 Peer.prototype._relay = function(data) {
+    console.log("send relay messge to " + this._id);
     this._signalChannel.send('relay', data, this._id);
 };
 
