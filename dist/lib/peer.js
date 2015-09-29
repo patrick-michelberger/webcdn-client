@@ -70,7 +70,9 @@ Peer.prototype.setIceCandidates = function(candidate) {
 Peer.prototype._createPeerConnection = function() {
     var self = this;
     var pc = new this._wrtc.RTCPeerConnection({
-        iceServers: this._iceUrls
+        iceServers: [{
+            url: 'stun:stun.l.google.com:19302'
+        }]
     });
 
     // ICE handlers
@@ -197,6 +199,7 @@ Peer.prototype._sendImage = function(hash) {
 
 Peer.prototype._relay = function(data) {
     console.log("send relay messge to " + this._id);
+    console.log("data: ", data);
     this._signalChannel.send('relay', data, this._id);
 };
 
