@@ -69,27 +69,20 @@ Peer.prototype.setIceCandidates = function(candidate) {
 
 Peer.prototype._createPeerConnection = function() {
     var self = this;
-    var pc = new this._wrtc.RTCPeerConnection({
+
+    var peerConfig = {
         "iceServers": [{
-            "url": "stun:turn01.uswest.xirsys.com"
-        }, {
-            "username": "1_59bd5430-66ee-11e5-90d4-d766915de752",
-            "url": "turn:turn01.uswest.xirsys.com:443?transport=udp",
-            "credential": "59bd54d0-66ee-11e5-8e7e-2fa6adcbeda9"
-        }, {
-            "username": "1_59bd5430-66ee-11e5-90d4-d766915de752",
-            "url": "turn:turn01.uswest.xirsys.com:443?transport=tcp",
-            "credential": "59bd54d0-66ee-11e5-8e7e-2fa6adcbeda9"
-        }, {
-            "username": "1_59bd5430-66ee-11e5-90d4-d766915de752",
-            "url": "turn:turn01.uswest.xirsys.com:5349?transport=udp",
-            "credential": "59bd54d0-66ee-11e5-8e7e-2fa6adcbeda9"
-        }, {
-            "username": "1_59bd5430-66ee-11e5-90d4-d766915de752",
-            "url": "turn:turn01.uswest.xirsys.com:5349?transport=tcp",
-            "credential": "59bd54d0-66ee-11e5-8e7e-2fa6adcbeda9"
+            "urls": ["turn:104.155.45.181:3478?transport=udp", "turn:104.155.45.181:3478?transport=tcp", "turn:104.155.45.181:3479?transport=udp", "turn:104.155.45.181:3479?transport=tcp"],
+            "username": "1443702398:525222532",
+            "credential": "NW6n90cJpvZYHLiYP7dpL78f+/4="
         }]
-    });
+    };
+
+    var peerConstraints = {
+        "optional": []
+    };
+
+    var pc = new this._wrtc.RTCPeerConnection(peerConfig, peerConstraints);
 
     // ICE handlers
     pc.onicecandidate = function(event) {
