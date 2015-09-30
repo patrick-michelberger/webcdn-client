@@ -86,8 +86,7 @@ Peer.prototype._createPeerConnection = function() {
 
     // ICE handlers
     pc.onicecandidate = function(event) {
-        console.log("onicecandidate: ", event.candidate);
-        if (event.candidate && self._originator === true) {
+        if (event.candidate) {
             self._iceCallback.call(self, event);
         }
     };
