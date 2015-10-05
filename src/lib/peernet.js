@@ -52,7 +52,7 @@ Peernet.prototype.fetch = function(peerid, hash, callback) {
 };
 
 Peernet.prototype._send = function(peerid, data, callback) {
-    var peer = this._createConnection(peerid, true);
+    var peer = this._createConnection(peerid, data.hash, true);
     peer.callbacks[data.hash] = callback;
     var dataChannel = peer.dataChannel;
     data = JSON.stringify(data);
@@ -82,12 +82,13 @@ Peernet.prototype._send = function(peerid, data, callback) {
  * Create a peer connection with given peer id for a given resource hash value. 
  * @param {String} peerid - unique peer id  
  * @param {String} hash - unique resource hash value
+ * @param {Boolean} originator - indicates if peer originates the connection
  * @return {Peer}
  */
-Peernet.prototype._createConnection = function(peerid, originator) {
+Peernet.prototype._createConnection = function(peerid, hash, originator) {
     var self = this;
     if (!this._peers[peerid]) {
-        Statistics.mark("pc_connect_start:" + peerid);
+        console.log("create new peer");
         // Create new peer
         this._peers[peerid] = new Peer({
             "id": peerid,
@@ -98,6 +99,10 @@ Peernet.prototype._createConnection = function(peerid, originator) {
             "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
         });
+    } else {
+        console.log("peer is already present ....");
+        // Statistics.mark("pc_connect_end:" + peerid);
+        //Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", peerid);
     }
     return this._peers[peerid];
 };
@@ -112,7 +117,7 @@ Peernet.prototype._reset = function(peerid) {
 
 Peernet.prototype._handleRelayMessage = function(msg) {
     var self = this;
-    var peer = this._createConnection(msg.from, false);
+    var peer = this._createConnection(msg.from, false, false);
     if (msg && msg.data && msg.data.sdp) {
         peer._otherSDP = msg.data;
         peer.connection.setRemoteDescription(new self._wrtc.RTCSessionDescription(msg.data), function() {
