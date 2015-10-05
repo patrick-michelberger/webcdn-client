@@ -101,12 +101,12 @@ Peer.prototype._createPeerConnection = function() {
     };
 
     pc.onsignalingstatechange = function()  {
-        console.log("pc.signalingState: ", pc.signalingState);
+        self._logger.trace(pc.signalingState);
     };
 
     pc.oniceconnectionstatechange = function(evt) {
-        console.log("pc.iceConnectionState: ", pc.iceConnectionState);
-        console.log("pc.iceGatheringState: ", pc.iceGatheringState);
+        self._logger.trace("pc.iceConnectionState: " + pc.iceConnectionState);
+        self._logger.trace("pc.iceGatheringState: " + pc.iceGatheringState);
     };
 
     // DateChannel creation handler (other peer)
@@ -117,7 +117,7 @@ Peer.prototype._createPeerConnection = function() {
         if (self._originator) {
             Statistics.mark("pc_connect_end:" + self._id);
             Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", self._id);
-            console.log("Statistics.PC_CONNECT_DURATION: ", Statistics.PC_CONNECT_DURATION);
+            self._logger.trace("Statistics.PC_CONNECT_DURATION: " + Statistics.PC_CONNECT_DURATION);
         }
     };
     return pc;

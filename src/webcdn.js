@@ -74,7 +74,7 @@ function WebCDN(config) {
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
     var id = getQueryId(coordinatorUrl);
-    callback = callback ||   function() {};
+    callback = callback || function() {};
 
     if (!id) {
         coordinatorUrl += "?id=" + this.uuid;
@@ -107,6 +107,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
             Statistics.mark("ws_connect_end");
             Statistics.WS_CONNECT_DURATION = Statistics.measureByType("ws_connect");
             self._initLoad();
+            callback();
         });
     };
 };
@@ -122,7 +123,6 @@ WebCDN.prototype.load = function(hash) {
     this._tracker.getInfo(hash, function(data) {
         Statistics.mark("lookup_end:" + hash);
         Statistics.measureByType('lookup', hash);
-        console.log("lookup-response: ", data);
         var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
@@ -146,8 +146,10 @@ WebCDN.prototype._connect = function(url, callback) {
 WebCDN.prototype._initLoad = function() {
     var errors = [];
     this._items.forEach(function(item) {
-        this._createHash(item);
-        this.load(item.dataset.webcdnHash);
+        if (item.dataset.webcdnLoadManually !== "true") {
+            this._createHash(item);
+            this.load(item.dataset.webcdnHash);
+        }
     }, this);
 };
 

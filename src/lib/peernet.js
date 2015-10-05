@@ -60,7 +60,6 @@ Peernet.prototype._send = function(peerid, data, callback) {
         this._reset(peerid);
         return;
     }
-    console.log("dataChannel.readyState: ", dataChannel.readyState);
     if (dataChannel.readyState === 'open') {
         dataChannel.send(data);
     } else if (dataChannel.readyState === 'connecting') {
@@ -88,7 +87,6 @@ Peernet.prototype._send = function(peerid, data, callback) {
 Peernet.prototype._createConnection = function(peerid, hash, originator) {
     var self = this;
     if (!this._peers[peerid]) {
-        console.log("create new peer");
         // Create new peer
         this._peers[peerid] = new Peer({
             "id": peerid,
@@ -99,11 +97,7 @@ Peernet.prototype._createConnection = function(peerid, hash, originator) {
             "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
         });
-    } else {
-        console.log("peer is already present ....");
-        // Statistics.mark("pc_connect_end:" + peerid);
-        //Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", peerid);
-    }
+    } 
     return this._peers[peerid];
 };
 
