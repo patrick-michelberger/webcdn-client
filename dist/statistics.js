@@ -157,7 +157,6 @@ Statistics.mark = function(name) {
 };
 
 Statistics.measureByType = function(type, hash, peerid)  {
-    console.log("measure " + type + " with hash " + hash);
     var name = duration = type + "_duration";
     var start = type + "_start";
     var end = type + "_end";

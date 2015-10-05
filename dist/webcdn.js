@@ -3307,12 +3307,12 @@ Peer.prototype._createPeerConnection = function() {
     };
 
     pc.onsignalingstatechange = function()  {
-        console.log("pc.signalingState: ", pc.signalingState);
+        self._logger.trace(pc.signalingState);
     };
 
     pc.oniceconnectionstatechange = function(evt) {
-        console.log("pc.iceConnectionState: ", pc.iceConnectionState);
-        console.log("pc.iceGatheringState: ", pc.iceGatheringState);
+        self._logger.trace("pc.iceConnectionState: " + pc.iceConnectionState);
+        self._logger.trace("pc.iceGatheringState: " + pc.iceGatheringState);
     };
 
     // DateChannel creation handler (other peer)
@@ -3323,7 +3323,7 @@ Peer.prototype._createPeerConnection = function() {
         if (self._originator) {
             Statistics.mark("pc_connect_end:" + self._id);
             Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", self._id);
-            console.log("Statistics.PC_CONNECT_DURATION: ", Statistics.PC_CONNECT_DURATION);
+            self._logger.trace("Statistics.PC_CONNECT_DURATION: " + Statistics.PC_CONNECT_DURATION);
         }
     };
     return pc;
@@ -3504,7 +3504,6 @@ Peernet.prototype._send = function(peerid, data, callback) {
         this._reset(peerid);
         return;
     }
-    console.log("dataChannel.readyState: ", dataChannel.readyState);
     if (dataChannel.readyState === 'open') {
         dataChannel.send(data);
     } else if (dataChannel.readyState === 'connecting') {
@@ -3532,7 +3531,6 @@ Peernet.prototype._send = function(peerid, data, callback) {
 Peernet.prototype._createConnection = function(peerid, hash, originator) {
     var self = this;
     if (!this._peers[peerid]) {
-        console.log("create new peer");
         // Create new peer
         this._peers[peerid] = new Peer({
             "id": peerid,
@@ -3543,11 +3541,7 @@ Peernet.prototype._createConnection = function(peerid, hash, originator) {
             "iceUrls": this._iceUrls,
             "wrtc": this._wrtc
         });
-    } else {
-        console.log("peer is already present ....");
-        // Statistics.mark("pc_connect_end:" + peerid);
-        //Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", peerid);
-    }
+    } 
     return this._peers[peerid];
 };
 
@@ -3740,7 +3734,6 @@ Statistics.mark = function(name) {
 };
 
 Statistics.measureByType = function(type, hash, peerid)  {
-    console.log("measure " + type + " with hash " + hash);
     var name = duration = type + "_duration";
     var start = type + "_start";
     var end = type + "_end";
@@ -4006,7 +3999,7 @@ function WebCDN(config) {
 WebCDN.prototype.init = function(coordinatorUrl, callback) {
     var self = this;
     var id = getQueryId(coordinatorUrl);
-    callback = callback ||   function() {};
+    callback = callback || function() {};
 
     if (!id) {
         coordinatorUrl += "?id=" + this.uuid;
@@ -4039,6 +4032,7 @@ WebCDN.prototype.init = function(coordinatorUrl, callback) {
             Statistics.mark("ws_connect_end");
             Statistics.WS_CONNECT_DURATION = Statistics.measureByType("ws_connect");
             self._initLoad();
+            callback();
         });
     };
 };
@@ -4054,7 +4048,6 @@ WebCDN.prototype.load = function(hash) {
     this._tracker.getInfo(hash, function(data) {
         Statistics.mark("lookup_end:" + hash);
         Statistics.measureByType('lookup', hash);
-        console.log("lookup-response: ", data);
         var download = new Download(data.peerid, data.hash, data.contentHash, self._peernet, self._logger, function(data, err) {
             self.createObjectURLFromArrayBuffer(hash, data);
         });
@@ -4078,8 +4071,10 @@ WebCDN.prototype._connect = function(url, callback) {
 WebCDN.prototype._initLoad = function() {
     var errors = [];
     this._items.forEach(function(item) {
-        this._createHash(item);
-        this.load(item.dataset.webcdnHash);
+        if (item.dataset.webcdnLoadManually !== "true") {
+            this._createHash(item);
+            this.load(item.dataset.webcdnHash);
+        }
     }, this);
 };
 
