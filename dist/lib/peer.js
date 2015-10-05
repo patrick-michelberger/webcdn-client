@@ -82,6 +82,10 @@ Peer.prototype._createPeerConnection = function() {
         "optional": []
     };
 
+    if (this._originator) {
+        Statistics.mark("pc_connect_start:" + this._id);
+    }
+
     var pc = new this._wrtc.RTCPeerConnection(peerConfig, peerConstraints);
 
     // ICE handlers
@@ -110,8 +114,11 @@ Peer.prototype._createPeerConnection = function() {
         event.channel.onmessage = function(event) {
             self._handleMessage.call(self, event);
         };
-        Statistics.mark("pc_connect_end:" + self._id);
-        Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", self._id);
+        if (self._originator) {
+            Statistics.mark("pc_connect_end:" + self._id);
+            Statistics.PC_CONNECT_DURATION = Statistics.measureByType("pc_connect", self._id);
+            console.log("Statistics.PC_CONNECT_DURATION: ", Statistics.PC_CONNECT_DURATION);
+        }
     };
     return pc;
 };

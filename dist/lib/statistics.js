@@ -9,7 +9,7 @@ var Resource = require('./resource.js');
 
 var Statistics = {};
 Statistics.WS_CONNECT_DURATION = false;
-Statistics.PC_CONNECT_DURATION = false;
+Statistics.PC_CONNECT_DURATION = 0;
 Statistics.resources = {}; // .resources[hash] = Resource
 
 /**
@@ -144,6 +144,7 @@ Statistics.measureByType = function(type, hash, peerid)  {
             }
             if (type === "fetch") {
                 resource.setProperty("seeder", peerid);
+                resource.setProperty("pc_connect", Statistics.PC_CONNECT_DURATION);
             }
             resource.setProperty(type, result[0].duration);
 
